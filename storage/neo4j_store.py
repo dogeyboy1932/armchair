@@ -134,6 +134,31 @@ def get_neighbors_graph(course_id: str, top: int = 10) -> list[dict]:
         return [dict(r) for r in result]
 
 
+def get_full_graph(min_score: float = 0.4) -> dict:
+    """Return all nodes and edges for graph visualisation."""
+    with _get_driver().session() as s:
+        nodes_result = s.run("""
+            MATCH (c:Course)
+            RETURN c.id AS id, c.name AS name,
+                   coalesce(c.community, 0)  AS community,
+                   coalesce(c.pagerank, 0.0) AS pagerank
+        """)
+        nodes = [dict(r) for r in nodes_result]
+
+        edges_result = s.run("""
+            MATCH (a:Course)-[r:SIMILAR_TO]->(b:Course)
+            WHERE r.score >= $min_score
+            RETURN a.id AS source, b.id AS target,
+                   r.score         AS score,
+                   r.lex_score     AS lex_score,
+                   r.sem_score     AS sem_score,
+                   r.driving_terms AS driving_terms
+        """, min_score=min_score)
+        edges = [dict(r) for r in edges_result]
+
+    return {"nodes": nodes, "edges": edges}
+
+
 def clear():
     with _get_driver().session() as s:
         s.run("MATCH (n) DETACH DELETE n")

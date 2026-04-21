@@ -1,6 +1,7 @@
 # Storage
 psycopg2-binary>=2.9
 pymilvus==2.3.6
+marshmallow>=3.13,<4.0.0       # pymilvus→environs requires __version_info__ (added in 3.13)
 neo4j>=5.14,<6.0
 
 # ML / Embeddings
@@ -14,6 +15,7 @@ pdfplumber>=0.10
 fastapi>=0.109
 uvicorn[standard]>=0.27
 python-multipart>=0.0.7
+aiofiles>=23.0
 
 # Utils
 python-dotenv>=1.0

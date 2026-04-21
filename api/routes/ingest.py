@@ -56,13 +56,15 @@ def _run_ingest(course_id: str, course_name: str, topics: list[str], description
     ])
     pg_store.upsert_term_counts(course_id, term_counts)
 
-    # Encode and store vectors
-    embeddings = encode([c['raw_text'] for c in chunks])
-    milvus.insert_chunks([
-        {'chunk_id': chunks[i]['chunk_id'], 'course_id': course_id,
-         'embedding': embeddings[i]}
-        for i in range(len(chunks))
-    ])
+    # Only embed topic + definition chunks (description/objective are too generic)
+    embed_chunks = [c for c in chunks if c['chunk_type'] in ('topic', 'definition')]
+    if embed_chunks:
+        embeddings = encode([c['raw_text'] for c in embed_chunks])
+        milvus.insert_chunks([
+            {'chunk_id': embed_chunks[i]['chunk_id'], 'course_id': course_id,
+             'embedding': embeddings[i]}
+            for i in range(len(embed_chunks))
+        ])
 
     # Recompute scores for this course vs all others
     all_counts = pg_store.get_all_term_counts()
@@ -70,7 +72,13 @@ def _run_ingest(course_id: str, course_name: str, topics: list[str], description
     idf = compute_idf(all_counts)
     for other_id in lms:
         if other_id != course_id:
-            score_pair(course_id, other_id, lms, idf)
+            score_pair(course_id, other_id, lms, idf, all_counts)
+
+    # Re-run community detection so graph clusters update
+    try:
+        neo4j.run_community_detection()
+    except Exception as e:
+        print(f"[ingest] community detection skipped: {e}")
 
     print(f"[ingest] '{course_name}' done — {len(chunks)} chunks, "
           f"{len(lms)-1} pairs scored.")

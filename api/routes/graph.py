@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
-import storage.neo4j_store as neo4j
+from storage import neo4j_store as neo4j
 
 router = APIRouter()
 
@@ -36,6 +36,12 @@ def get_communities():
             detail="No communities found. Run scripts/build_graph.py first.",
         )
     return communities
+
+
+@router.get("/all")
+def full_graph(min_score: float = Query(0.4, ge=0.0, le=1.0)):
+    """All nodes + edges for graph visualisation (edges filtered by min_score)."""
+    return neo4j.get_full_graph(min_score)
 
 
 @router.get("/neighbors")

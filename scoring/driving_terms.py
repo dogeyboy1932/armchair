@@ -20,6 +20,8 @@ def driving_terms(
     lm_a: dict,
     lm_b: dict,
     idf: dict,
+    raw_a: dict | None = None,
+    raw_b: dict | None = None,
     top_k: int | None = None,
 ) -> list[str]:
     """
@@ -27,14 +29,24 @@ def driving_terms(
 
         score(w) = min(P(w|A), P(w|B)) * IDF(w)
 
-    Terms that both courses emphasise AND that are distinctive across
-    the corpus bubble to the top.
+    When raw_a and raw_b (original term-count dicts) are provided, only terms
+    that actually appear in BOTH documents are considered.  This prevents
+    Dirichlet-smoothed ghost probabilities for absent terms from surfacing
+    corpus-level boilerplate (e.g. "energy" appearing in every LM via prior).
     """
     if top_k is None:
         top_k = config.TOP_K_DRIVING_TERMS
 
+    # Only consider terms that genuinely appear in both documents
+    if raw_a is not None and raw_b is not None:
+        candidates = set(raw_a) & set(raw_b)
+    else:
+        candidates = set(lm_a) & set(lm_b)
+
     scores: dict[str, float] = {}
-    for term in set(lm_a) & set(lm_b):
-        scores[term] = min(lm_a[term], lm_b[term]) * idf.get(term, 0.0)
+    for term in candidates:
+        idf_val = idf.get(term, 0.0)
+        if idf_val > 0:
+            scores[term] = min(lm_a.get(term, 0.0), lm_b.get(term, 0.0)) * idf_val
 
     return sorted(scores, key=scores.__getitem__, reverse=True)[:top_k]

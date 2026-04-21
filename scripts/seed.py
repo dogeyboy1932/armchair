@@ -59,14 +59,17 @@ def main():
         ])
         pg_store.upsert_term_counts(cid, term_counts)
 
-        texts      = [c['raw_text'] for c in chunks]
-        embeddings = encode(texts)
-        milvus.insert_chunks([
-            {'chunk_id': chunks[i]['chunk_id'],
-             'course_id': cid,
-             'embedding': embeddings[i]}
-            for i in range(len(chunks))
-        ])
+        # Only embed topic + definition chunks — description/objective chunks are
+        # too generic and pull unrelated courses together in embedding space.
+        embed_chunks = [c for c in chunks if c['chunk_type'] in ('topic', 'definition')]
+        if embed_chunks:
+            embeddings = encode([c['raw_text'] for c in embed_chunks])
+            milvus.insert_chunks([
+                {'chunk_id': embed_chunks[i]['chunk_id'],
+                 'course_id': cid,
+                 'embedding': embeddings[i]}
+                for i in range(len(embed_chunks))
+            ])
 
     print(f"\nSeed complete — {len(syllabi)} courses loaded.")
     print("Next step: python scripts/build_graph.py")

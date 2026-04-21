@@ -5,46 +5,66 @@ import nltk
 nltk.download('stopwords', quiet=True)
 _STOP = set(nltk.corpus.stopwords.words('english'))
 
+# Boilerplate words that appear in nearly every syllabus but carry no topical signal.
+# "sep" is the tokenised form of the "[SEP]" separator we inject into chunk text.
+_DOMAIN_STOP = {
+    'sep',                                          # [SEP] separator artefact
+    'university', 'illinois', 'urbana', 'champaign', 'uiuc',  # institution
+    'course', 'courses', 'student', 'students',    # academic meta
+    'credit', 'credits', 'hour', 'hours',          # administrative
+    'lecture', 'lectures', 'lab', 'laboratory',    # structural
+    'section', 'sections', 'semester',             # structural
+    'prerequisite', 'prerequisites',               # administrative
+    'exam', 'exams', 'midterm', 'quiz', 'quizzes', # assessment
+    'homework', 'assignment', 'assignments',       # assessment
+    'grade', 'grades', 'grading', 'syllabus',      # administrative
+    'professor', 'instructor', 'week', 'weeks',    # people/time
+    'sci', 'engrg',                                # CS 101 abbreviations
+}
+_ALL_STOP = _STOP | _DOMAIN_STOP
+
 
 def tokenize(text: str) -> list[str]:
-    """Lowercase, keep alpha tokens > 2 chars, strip stopwords."""
+    """Lowercase, keep alpha tokens ≥ 3 chars, strip stopwords + domain noise."""
     tokens = re.findall(r'\b[a-zA-Z][a-zA-Z0-9\-]{2,}\b', text.lower())
-    return [t for t in tokens if t not in _STOP]
+    return [t for t in tokens if t not in _ALL_STOP]
 
 
 def chunk_course(course: dict, topic_defs: dict) -> tuple[list[dict], dict]:
     """
     Build chunk dicts and term counts for one course.
 
-    course    — entry from mechse_syllabi.json
-    topic_defs — {topic_key: definition_text}  (topic_definitions.json)
+    raw_text  is stored as-is (course name prefix helps the embedding model).
+    term_text is what goes into the LM term counts — excludes the course name
+              prefix so it doesn't inflate generic name words.
 
     Returns (chunks, term_counts)
-      chunks      : list of {chunk_id, course_id, chunk_type, raw_text}
-      term_counts : {term: count}  over the full course corpus
     """
     course_id   = course['id']
     course_name = course['name']
     chunks: list[dict] = []
     all_tokens: list[str] = []
 
-    def _add(chunk_type: str, idx: int, text: str):
+    def _add(chunk_type: str, idx: int, raw_text: str, term_text: str):
         safe_id = course_id.replace(' ', '_').replace('/', '_')
         chunks.append({
             'chunk_id':   f"{safe_id}__{chunk_type}__{idx}",
             'course_id':  course_id,
             'chunk_type': chunk_type,
-            'raw_text':   text.strip(),
+            'raw_text':   raw_text.strip(),
         })
-        all_tokens.extend(tokenize(text))
+        all_tokens.extend(tokenize(term_text))
 
     # ── 1. Topic chunks (enriched with definition where available) ──────────────
     for i, topic in enumerate(course.get('topics', [])):
         key        = f"{course_id}: {topic}"
         definition = topic_defs.get(key, '')
-        text = (f"{course_name} [SEP] {topic}: {definition}"
-                if definition else f"{course_name} [SEP] {topic}")
-        _add('topic', i, text)
+        # raw_text: course name prefix gives embedding model context
+        # term_text: only topic + definition — no repeated course-name noise
+        raw_text  = (f"{course_name} [SEP] {topic}: {definition}"
+                     if definition else f"{course_name} [SEP] {topic}")
+        term_text = f"{topic}: {definition}" if definition else topic
+        _add('topic', i, raw_text, term_text)
 
     # ── 2. Inline definition chunks (CHEM courses only) ─────────────────────────
     defs = course.get('definitions', [])
@@ -52,17 +72,18 @@ def chunk_course(course: dict, topic_defs: dict) -> tuple[list[dict], dict]:
         for i, (term, entry) in enumerate(
             zip(defs[0]['d_term'], defs[0]['d_entry'])
         ):
-            _add('definition', i, f"{term}: {entry}")
+            text = f"{term}: {entry}"
+            _add('definition', i, text, text)
 
-    # ── 3. Course description ────────────────────────────────────────────────────
+    # ── 3. Course description (LM term counts only — not stored in Milvus) ──────
     desc = course.get('description', '')
     if len(desc) > 50:
-        _add('description', 0, f"{course_name}: {desc}")
+        _add('description', 0, f"{course_name}: {desc}", desc)
 
-    # ── 4. Learning objectives ───────────────────────────────────────────────────
+    # ── 4. Learning objectives (LM term counts only — not stored in Milvus) ─────
     objectives = course.get('objectives', [])
     if objectives:
-        _add('objective', 0,
-             f"{course_name} objectives: " + '. '.join(objectives))
+        obj_text = '. '.join(objectives)
+        _add('objective', 0, f"{course_name} objectives: {obj_text}", obj_text)
 
     return chunks, dict(Counter(all_tokens))
