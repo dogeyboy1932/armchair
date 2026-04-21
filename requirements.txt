@@ -1,0 +1,23 @@
+# Storage
+psycopg2-binary>=2.9
+pymilvus==2.3.6
+neo4j>=5.14,<6.0
+
+# ML / Embeddings
+sentence-transformers>=2.3,<3.0
+keybert>=0.8
+
+# PDF parsing
+pdfplumber>=0.10
+
+# API
+fastapi>=0.109
+uvicorn[standard]>=0.27
+python-multipart>=0.0.7
+
+# Utils
+python-dotenv>=1.0
+numpy>=1.24,<2.0
+scipy>=1.11
+nltk>=3.8
+tqdm>=4.66
