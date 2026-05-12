@@ -87,6 +87,57 @@ def search_in_course(
     return scores
 
 
+def get_chunk_embedding(chunk_id: str) -> 'np.ndarray | None':
+    """Return the embedding for a single chunk_id, or None if not found."""
+    col = get_or_create_collection()
+    escaped = chunk_id.replace('"', '\\"')
+    results = col.query(
+        expr=f'chunk_id == "{escaped}"',
+        output_fields=["embedding"],
+    )
+    if results:
+        return np.array(results[0]["embedding"], dtype=np.float32)
+    return None
+
+
+def get_chunks_with_embeddings(course_id: str) -> dict:
+    """Return {chunk_id: embedding} for all chunks belonging to course_id."""
+    col = get_or_create_collection()
+    results = col.query(
+        expr=f'course_id == "{course_id}"',
+        output_fields=["chunk_id", "embedding"],
+    )
+    return {r["chunk_id"]: np.array(r["embedding"], dtype=np.float32) for r in results}
+
+
+def search_global_excluding(
+    query_vector: np.ndarray,
+    exclude_course_id: str,
+    limit: int = 10,
+) -> list[dict]:
+    """
+    ANN search across ALL courses except exclude_course_id.
+    Returns [{chunk_id, course_id, score}] sorted by score desc.
+    """
+    col = get_or_create_collection()
+    results = col.search(
+        data=[query_vector.tolist()],
+        anns_field="embedding",
+        param={"metric_type": "COSINE", "params": {}},
+        limit=limit + 30,  # over-fetch to absorb excluded-course hits
+        expr=f'course_id != "{exclude_course_id}"',
+        output_fields=["chunk_id", "course_id"],
+    )
+    hits = []
+    for hit in results[0]:
+        hits.append({
+            "chunk_id":  hit.fields["chunk_id"],
+            "course_id": hit.fields["course_id"],
+            "score":     float(hit.score),
+        })
+    return hits[:limit]
+
+
 def delete_course(course_id: str):
     col = get_or_create_collection()
     col.delete(expr=f'course_id == "{course_id}"')

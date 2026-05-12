@@ -21,6 +21,34 @@ def list_courses():
     ]
 
 
+@router.get("/{course_id:path}/topics")
+def get_course_topics(course_id: str):
+    """Return all labeled topics for a course with their category distributions."""
+    topics = pg_store.get_topic_texts_for_course(course_id, limit=200)
+    if not topics:
+        raise HTTPException(404, detail=f"No topics found for '{course_id}'")
+    import psycopg2
+    import config, json
+    conn = psycopg2.connect(
+        host=config.POSTGRES_HOST, port=config.POSTGRES_PORT,
+        dbname=config.POSTGRES_DB, user=config.POSTGRES_USER, password=config.POSTGRES_PASSWORD
+    )
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT topic_text, categories FROM topic_categories WHERE course_id=%s ORDER BY topic_text",
+        (course_id,)
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [
+        {
+            "topic_text": r[0],
+            "categories": r[1] if isinstance(r[1], dict) else json.loads(r[1]),
+        }
+        for r in rows
+    ]
+
+
 @router.get("/{course_id:path}")
 def get_course(course_id: str):
     rows = pg_store.get_all_courses()

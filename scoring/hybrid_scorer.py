@@ -5,17 +5,32 @@ import config
 from scoring.jsd               import lex_sim as _lex_sim, jsd as _jsd
 from scoring.vector_similarity import sem_sim as _sem_sim
 from scoring.driving_terms     import compute_idf, driving_terms as _driving_terms
+from scoring.category_scorer   import (
+    compute_category_jsd, compute_non_obvious,
+    course_category_vector,
+)
 from storage                   import postgres_store as pg_store
 from storage                   import neo4j_store    as neo4j
 
-# SciNCL cosine similarities for short academic text have a high floor
-# (~0.75–0.80) even for unrelated courses.  Subtract this floor and
-# re-scale to [0, 1] so the semantic component is actually discriminative.
-_SEM_FLOOR = 0.75
 
+def _hybrid(lex: float, sem: float, cat_jsd: float | None) -> float:
+    """
+    Weighted combination of lex, sem, and category similarity.
 
-def _calibrate_sem(raw: float) -> float:
-    return float(max(raw - _SEM_FLOOR, 0.0) / (1.0 - _SEM_FLOOR))
+    Weights (ALPHA_LEX, ALPHA_SEM, ALPHA_CAT) are read from config and auto-normalized.
+    When cat_jsd is unavailable, ALPHA_CAT is redistributed proportionally to lex and sem.
+    """
+    w_lex = config.ALPHA_LEX
+    w_sem = config.ALPHA_SEM
+    w_cat = config.ALPHA_CAT
+
+    if cat_jsd is None:
+        total = w_lex + w_sem
+        return (w_lex * lex + w_sem * sem) / total
+    else:
+        cat_sim = 1.0 - cat_jsd
+        total = w_lex + w_sem + w_cat
+        return (w_lex * lex + w_sem * sem + w_cat * cat_sim) / total
 
 
 def score_pair(
@@ -24,13 +39,16 @@ def score_pair(
     lms: dict,
     idf: dict,
     all_term_counts: dict | None = None,
+    category_vecs: dict | None = None,
 ) -> dict:
     """
     Compute hybrid similarity for one pair and persist results.
 
-    Lexical: TF-IDF cosine similarity (sparse — only actual term overlap).
-    Semantic: SciNCL cosine similarity re-scaled above a floor baseline.
-    Hybrid:   α · lex + (1-α) · sem
+    Lexical:      TF-IDF cosine (sparse term overlap).
+    Semantic:     SciNCL cosine (raw, no floor calibration).
+    Category:     1 - category_JSD (same-domain pairs score higher in hybrid).
+    Hybrid:       normalized weighted sum of the three components.
+    Non-obvious:  sem × category_JSD  (high only when similar meaning, different domain).
     """
     raw_a = all_term_counts.get(course_a) if all_term_counts else {}
     raw_b = all_term_counts.get(course_b) if all_term_counts else {}
@@ -38,17 +56,33 @@ def score_pair(
     lm_b  = lms[course_b]
 
     lex   = _lex_sim(raw_a, raw_b, idf)
-    j     = _jsd(lm_a, lm_b)     # stored for reference; not used in hybrid score
-    sem   = _calibrate_sem(_sem_sim(course_a, course_b))
-    final = config.ALPHA * lex + (1 - config.ALPHA) * sem
+    j     = _jsd(lm_a, lm_b)
+    sem   = _sem_sim(course_a, course_b)
     terms = _driving_terms(lm_a, lm_b, idf, raw_a, raw_b)
 
-    pg_store.upsert_similarity(course_a, course_b, final, lex, sem, j, terms)
+    cat_jsd = None
+    non_obvious = None
+    if category_vecs and course_a in category_vecs and course_b in category_vecs:
+        cat_jsd = compute_category_jsd(category_vecs[course_a], category_vecs[course_b])
+        non_obvious = compute_non_obvious(sem, cat_jsd)
+
+    final = _hybrid(lex, sem, cat_jsd)
+
+    pg_store.upsert_similarity(
+        course_a, course_b, final, lex, sem, j, terms,
+        category_jsd=cat_jsd, non_obvious_score=non_obvious,
+    )
 
     if final >= config.MIN_SCORE:
-        neo4j.upsert_edge(course_a, course_b, final, lex, sem, j, terms)
+        neo4j.upsert_edge(
+            course_a, course_b, final, lex, sem, j, terms,
+            non_obvious_score=non_obvious, category_jsd=cat_jsd,
+        )
 
-    return {'final': final, 'lex': lex, 'sem': sem, 'jsd': j, 'terms': terms}
+    return {
+        'final': final, 'lex': lex, 'sem': sem, 'jsd': j, 'terms': terms,
+        'category_jsd': cat_jsd, 'non_obvious': non_obvious,
+    }
 
 
 def score_all_pairs(lms: dict, all_term_counts: dict) -> int:
@@ -58,12 +92,25 @@ def score_all_pairs(lms: dict, all_term_counts: dict) -> int:
     """
     course_ids = list(lms.keys())
     idf        = compute_idf(all_term_counts)
+
+    # Load category distributions once — null-safe, falls back to no-op
+    category_vecs = {}
+    for cid in course_ids:
+        dists = pg_store.get_topic_categories_for_course(cid)
+        if dists:
+            category_vecs[cid] = course_category_vector(dists)
+    if category_vecs:
+        print(f"  Category vectors loaded for {len(category_vecs)}/{len(course_ids)} courses.")
+
     pairs      = list(combinations(course_ids, 2))
     edge_count = 0
 
     print(f"Scoring {len(pairs)} pairs across {len(course_ids)} courses …")
     for course_a, course_b in tqdm(pairs, unit="pair"):
-        result = score_pair(course_a, course_b, lms, idf, all_term_counts)
+        result = score_pair(
+            course_a, course_b, lms, idf, all_term_counts,
+            category_vecs=category_vecs if category_vecs else None,
+        )
         if result['final'] >= config.MIN_SCORE:
             edge_count += 1
 

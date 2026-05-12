@@ -21,9 +21,15 @@ NEO4J_USER     = os.environ.get('NEO4J_USER', 'neo4j')
 NEO4J_PASSWORD = os.environ.get('NEO4J_PASSWORD', '')
 
 # Scoring
-ALPHA               = float(os.environ.get('ALPHA', 0.5))     # balanced lex/sem
-DIRICHLET_MU        = float(os.environ.get('DIRICHLET_MU', 200.0))   # was 2000 — way too high for ~500-token docs
-MIN_SCORE           = float(os.environ.get('MIN_SCORE', 0.25))
+# Hybrid = (ALPHA_LEX·lex + ALPHA_SEM·sem + ALPHA_CAT·(1-category_jsd)) / sum(weights)
+# Weights are auto-normalized so they don't have to sum to 1.
+# When category_jsd is unavailable, ALPHA_CAT weight is split proportionally between lex and sem.
+ALPHA_LEX           = float(os.environ.get('ALPHA_LEX', 0.3))
+ALPHA_SEM           = float(os.environ.get('ALPHA_SEM', 0.5))
+ALPHA_CAT           = float(os.environ.get('ALPHA_CAT', 0.2))
+ALPHA               = float(os.environ.get('ALPHA', 0.4))     # legacy fallback, unused when ALPHA_LEX/SEM/CAT set
+DIRICHLET_MU        = float(os.environ.get('DIRICHLET_MU', 2000.0))
+MIN_SCORE           = float(os.environ.get('MIN_SCORE', 0.55))
 TOP_K_MILVUS        = int(os.environ.get('TOP_K_MILVUS', 5))
 TOP_K_DRIVING_TERMS = int(os.environ.get('TOP_K_DRIVING_TERMS', 8))
 
@@ -37,3 +43,9 @@ SYLLABI_PATH     = DATA_DIR / 'mechse_syllabi.json'
 DEFINITIONS_PATH = DATA_DIR / 'topic_definitions.json'
 COURSE_INFO_PATH = DATA_DIR / 'course_info.json'
 INSTRUCTORS_PATH = DATA_DIR / 'instructors.json'
+
+# LLM (Gemini API)
+GEMINI_API_KEY       = os.environ.get('GEMINI_API_KEY', '')
+CATEGORY_LABEL_MODEL = os.environ.get('CATEGORY_LABEL_MODEL', 'gemini-2.0-flash-lite')
+LLM_EXPLAIN_MODEL    = os.environ.get('LLM_EXPLAIN_MODEL', 'gemini-2.0-flash')
+NON_OBVIOUS_TOP_K    = int(os.environ.get('NON_OBVIOUS_TOP_K', 50))

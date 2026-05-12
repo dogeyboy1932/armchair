@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 import storage.postgres_store as pg_store
 import storage.neo4j_store    as neo4j
 from storage.milvus_store import get_or_create_collection
-from api.routes import courses, similarity, graph, ingest
+from api.routes import courses, similarity, graph, ingest, topics
 
 PUBLIC_DIR = Path(__file__).parent.parent / "public"
 
@@ -40,6 +40,7 @@ app.add_middleware(
 
 app.include_router(courses.router,    prefix="/courses",    tags=["courses"])
 app.include_router(similarity.router, prefix="/similarity", tags=["similarity"])
+app.include_router(topics.router,     prefix="/topics",     tags=["topics"])
 app.include_router(graph.router,      prefix="/graph",      tags=["graph"])
 app.include_router(ingest.router,     prefix="/ingest",     tags=["ingest"])
 

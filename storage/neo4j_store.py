@@ -33,19 +33,24 @@ def upsert_course(course_id: str, name: str, description: str = ''):
 
 def upsert_edge(course_a: str, course_b: str, score: float,
                 lex_score: float, sem_score: float,
-                jsd: float, driving_terms: list):
+                jsd: float, driving_terms: list,
+                non_obvious_score: float | None = None,
+                category_jsd: float | None = None):
     with _get_driver().session() as s:
         s.run("""
             MATCH (a:Course {id: $a}), (b:Course {id: $b})
             MERGE (a)-[r:SIMILAR_TO]-(b)
-            SET r.score         = $score,
-                r.lex_score     = $lex_score,
-                r.sem_score     = $sem_score,
-                r.jsd           = $jsd,
-                r.driving_terms = $driving_terms
+            SET r.score              = $score,
+                r.lex_score          = $lex_score,
+                r.sem_score          = $sem_score,
+                r.jsd                = $jsd,
+                r.driving_terms      = $driving_terms,
+                r.non_obvious_score  = $non_obvious_score,
+                r.category_jsd       = $category_jsd
         """, a=course_a, b=course_b, score=score,
              lex_score=lex_score, sem_score=sem_score,
-             jsd=jsd, driving_terms=driving_terms)
+             jsd=jsd, driving_terms=driving_terms,
+             non_obvious_score=non_obvious_score, category_jsd=category_jsd)
 
 
 def run_community_detection():
@@ -149,10 +154,12 @@ def get_full_graph(min_score: float = 0.4) -> dict:
             MATCH (a:Course)-[r:SIMILAR_TO]->(b:Course)
             WHERE r.score >= $min_score
             RETURN a.id AS source, b.id AS target,
-                   r.score         AS score,
-                   r.lex_score     AS lex_score,
-                   r.sem_score     AS sem_score,
-                   r.driving_terms AS driving_terms
+                   r.score              AS score,
+                   r.lex_score          AS lex_score,
+                   r.sem_score          AS sem_score,
+                   r.driving_terms      AS driving_terms,
+                   r.non_obvious_score  AS non_obvious_score,
+                   r.category_jsd       AS category_jsd
         """, min_score=min_score)
         edges = [dict(r) for r in edges_result]
 

@@ -66,22 +66,49 @@ CREATE TABLE IF NOT EXISTS term_counts (
 );
 
 CREATE TABLE IF NOT EXISTS similarity_cache (
-    course_a      VARCHAR NOT NULL,
-    course_b      VARCHAR NOT NULL,
-    final_score   FLOAT,
-    lex_score     FLOAT,
-    sem_score     FLOAT,
-    jsd           FLOAT,
-    driving_terms TEXT    DEFAULT '[]',
-    computed_at   TIMESTAMP DEFAULT NOW(),
+    course_a           VARCHAR NOT NULL,
+    course_b           VARCHAR NOT NULL,
+    final_score        FLOAT,
+    lex_score          FLOAT,
+    sem_score          FLOAT,
+    jsd                FLOAT,
+    driving_terms      TEXT    DEFAULT '[]',
+    category_jsd       FLOAT,
+    non_obvious_score  FLOAT,
+    llm_explanation    TEXT,
+    computed_at        TIMESTAMP DEFAULT NOW(),
     PRIMARY KEY (course_a, course_b)
 );
+
+CREATE TABLE IF NOT EXISTS topic_categories (
+    course_id   VARCHAR NOT NULL,
+    topic_text  TEXT    NOT NULL,
+    categories  JSONB   NOT NULL,
+    labeled_at  TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (course_id, topic_text)
+);
+
+CREATE TABLE IF NOT EXISTS topic_similarity (
+    course_a  VARCHAR NOT NULL,
+    topic_a   TEXT    NOT NULL,
+    course_b  VARCHAR NOT NULL,
+    topic_b   TEXT    NOT NULL,
+    sem_score FLOAT   NOT NULL,
+    PRIMARY KEY (course_a, topic_a, course_b, topic_b)
+);
+"""
+
+_MIGRATION = """
+ALTER TABLE similarity_cache ADD COLUMN IF NOT EXISTS category_jsd      FLOAT;
+ALTER TABLE similarity_cache ADD COLUMN IF NOT EXISTS non_obvious_score  FLOAT;
+ALTER TABLE similarity_cache ADD COLUMN IF NOT EXISTS llm_explanation    TEXT;
 """
 
 
 def init_schema():
     with _Conn() as cur:
         cur.execute(_DDL)
+        cur.execute(_MIGRATION)
 
 
 def upsert_course(course_id, name, description='', prereqs='',
@@ -125,6 +152,19 @@ def upsert_term_counts(course_id: str, counts: dict):
         execute_values(cur, sql, rows)
 
 
+def accumulate_term_counts(course_id: str, counts: dict):
+    """Add new counts to existing term counts (for appending material to a course)."""
+    rows = [(course_id, term, cnt) for term, cnt in counts.items()]
+    if not rows:
+        return
+    sql = """
+    INSERT INTO term_counts (course_id, term, count) VALUES %s
+    ON CONFLICT (course_id, term) DO UPDATE SET count = term_counts.count + EXCLUDED.count
+    """
+    with _Conn() as cur:
+        execute_values(cur, sql, rows)
+
+
 def get_all_term_counts() -> dict:
     """Returns {course_id: {term: count}}"""
     with _Conn() as cur:
@@ -151,28 +191,36 @@ def get_chunks_for_course(course_id: str) -> list[tuple]:
 
 def upsert_similarity(course_a: str, course_b: str, final_score: float,
                       lex_score: float, sem_score: float, jsd: float,
-                      driving_terms: list):
-    # Always store with lexicographic key order so lookups are consistent
+                      driving_terms: list, category_jsd: float | None = None,
+                      non_obvious_score: float | None = None,
+                      llm_explanation: str | None = None):
     a, b = sorted([course_a, course_b])
     sql = """
     INSERT INTO similarity_cache
-        (course_a, course_b, final_score, lex_score, sem_score, jsd, driving_terms)
-    VALUES (%s,%s,%s,%s,%s,%s,%s)
+        (course_a, course_b, final_score, lex_score, sem_score, jsd, driving_terms,
+         category_jsd, non_obvious_score, llm_explanation)
+    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
     ON CONFLICT (course_a, course_b) DO UPDATE SET
         final_score=EXCLUDED.final_score, lex_score=EXCLUDED.lex_score,
         sem_score=EXCLUDED.sem_score, jsd=EXCLUDED.jsd,
-        driving_terms=EXCLUDED.driving_terms, computed_at=NOW()
+        driving_terms=EXCLUDED.driving_terms,
+        category_jsd=COALESCE(EXCLUDED.category_jsd, similarity_cache.category_jsd),
+        non_obvious_score=COALESCE(EXCLUDED.non_obvious_score, similarity_cache.non_obvious_score),
+        llm_explanation=COALESCE(EXCLUDED.llm_explanation, similarity_cache.llm_explanation),
+        computed_at=NOW()
     """
     with _Conn() as cur:
         cur.execute(sql, (a, b, final_score, lex_score, sem_score, jsd,
-                          json.dumps(driving_terms)))
+                          json.dumps(driving_terms), category_jsd,
+                          non_obvious_score, llm_explanation))
 
 
 def get_similarity(course_a: str, course_b: str) -> Optional[dict]:
     a, b = sorted([course_a, course_b])
     with _Conn() as cur:
         cur.execute(
-            "SELECT course_a, course_b, final_score, lex_score, sem_score, jsd, driving_terms "
+            "SELECT course_a, course_b, final_score, lex_score, sem_score, jsd, "
+            "driving_terms, category_jsd, non_obvious_score, llm_explanation "
             "FROM similarity_cache WHERE course_a=%s AND course_b=%s",
             (a, b)
         )
@@ -184,31 +232,159 @@ def get_similarity(course_a: str, course_b: str) -> Optional[dict]:
         'final_score': row[2], 'lex_score': row[3],
         'sem_score': row[4], 'jsd': row[5],
         'driving_terms': json.loads(row[6]) if row[6] else [],
+        'category_jsd': row[7],
+        'non_obvious_score': row[8],
+        'llm_explanation': row[9],
     }
 
 
-def get_neighbors(course_id: str, top: int = 10) -> list[dict]:
+def get_neighbors(course_id: str, top: int = 10, sort: str = 'hybrid') -> list[dict]:
+    order_col = 'non_obvious_score' if sort == 'non_obvious' else 'final_score'
     with _Conn() as cur:
-        cur.execute("""
+        cur.execute(f"""
             SELECT
                 CASE WHEN course_a=%s THEN course_b ELSE course_a END AS other,
-                final_score, lex_score, sem_score, driving_terms
+                final_score, lex_score, sem_score, driving_terms,
+                category_jsd, non_obvious_score, llm_explanation
             FROM similarity_cache
             WHERE course_a=%s OR course_b=%s
-            ORDER BY final_score DESC
+            ORDER BY {order_col} DESC NULLS LAST
             LIMIT %s
         """, (course_id, course_id, course_id, top))
         rows = cur.fetchall()
     return [
         {
-            'course_id':    r[0],
-            'final_score':  r[1],
-            'lex_score':    r[2],
-            'sem_score':    r[3],
-            'driving_terms': json.loads(r[4]) if r[4] else [],
+            'course_id':          r[0],
+            'final_score':        r[1],
+            'lex_score':          r[2],
+            'sem_score':          r[3],
+            'driving_terms':      json.loads(r[4]) if r[4] else [],
+            'category_jsd':       r[5],
+            'non_obvious_score':  r[6],
+            'llm_explanation':    r[7],
         }
         for r in rows
     ]
+
+
+def get_top_non_obvious(top: int = 50, min_sem: float = 0.0) -> list[dict]:
+    with _Conn() as cur:
+        cur.execute("""
+            SELECT course_a, course_b, final_score, lex_score, sem_score,
+                   category_jsd, non_obvious_score, driving_terms, llm_explanation
+            FROM similarity_cache
+            WHERE non_obvious_score IS NOT NULL AND sem_score >= %s
+            ORDER BY non_obvious_score DESC
+            LIMIT %s
+        """, (min_sem, top))
+        rows = cur.fetchall()
+    return [
+        {
+            'course_a':           r[0], 'course_b':           r[1],
+            'final_score':        r[2], 'lex_score':          r[3],
+            'sem_score':          r[4], 'category_jsd':       r[5],
+            'non_obvious_score':  r[6],
+            'driving_terms':      json.loads(r[7]) if r[7] else [],
+            'llm_explanation':    r[8],
+        }
+        for r in rows
+    ]
+
+
+def upsert_topic_category(course_id: str, topic_text: str, categories: dict):
+    with _Conn() as cur:
+        cur.execute("""
+            INSERT INTO topic_categories (course_id, topic_text, categories)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (course_id, topic_text) DO UPDATE
+            SET categories=EXCLUDED.categories, labeled_at=NOW()
+        """, (course_id, topic_text, json.dumps(categories)))
+
+
+def get_topic_categories_for_course(course_id: str) -> list[dict]:
+    with _Conn() as cur:
+        cur.execute(
+            "SELECT categories FROM topic_categories WHERE course_id=%s",
+            (course_id,)
+        )
+        rows = cur.fetchall()
+    return [r[0] if isinstance(r[0], dict) else json.loads(r[0]) for r in rows]
+
+
+def get_topic_texts_for_course(course_id: str, limit: int = 5) -> list[str]:
+    with _Conn() as cur:
+        cur.execute(
+            "SELECT topic_text FROM topic_categories WHERE course_id=%s LIMIT %s",
+            (course_id, limit)
+        )
+        return [r[0] for r in cur.fetchall()]
+
+
+def search_topics(query: str, limit: int = 40) -> list[dict]:
+    """Full-text ILIKE search over topic_text. Returns matches with categories."""
+    with _Conn() as cur:
+        cur.execute("""
+            SELECT course_id, topic_text, categories
+            FROM topic_categories
+            WHERE topic_text ILIKE %s
+            ORDER BY course_id, topic_text
+            LIMIT %s
+        """, (f'%{query}%', limit))
+        rows = cur.fetchall()
+    return [
+        {
+            'course_id':  r[0],
+            'topic_text': r[1],
+            'categories': r[2] if isinstance(r[2], dict) else json.loads(r[2]),
+        }
+        for r in rows
+    ]
+
+
+def upsert_topic_similarities(rows: list[tuple]):
+    """rows: (course_a, topic_a, course_b, topic_b, sem_score)"""
+    if not rows:
+        return
+    sql = """
+    INSERT INTO topic_similarity (course_a, topic_a, course_b, topic_b, sem_score)
+    VALUES %s
+    ON CONFLICT (course_a, topic_a, course_b, topic_b)
+    DO UPDATE SET sem_score = EXCLUDED.sem_score
+    """
+    with _Conn() as cur:
+        execute_values(cur, sql, rows)
+
+
+def get_similar_topics(course_id: str, topic_text: str, limit: int = 8) -> list[dict]:
+    """Return top similar topics from OTHER courses for a given topic."""
+    with _Conn() as cur:
+        cur.execute("""
+            SELECT other_course, other_topic, MAX(sem_score) AS sem_score
+            FROM (
+                SELECT course_b AS other_course, topic_b AS other_topic, sem_score
+                FROM topic_similarity
+                WHERE course_a = %s AND topic_a = %s
+                UNION ALL
+                SELECT course_a AS other_course, topic_a AS other_topic, sem_score
+                FROM topic_similarity
+                WHERE course_b = %s AND topic_b = %s
+            ) sub
+            GROUP BY other_course, other_topic
+            ORDER BY sem_score DESC
+            LIMIT %s
+        """, (course_id, topic_text, course_id, topic_text, limit))
+        rows = cur.fetchall()
+    return [{"course_id": r[0], "topic_text": r[1], "sem_score": round(r[2], 4)}
+            for r in rows]
+
+
+def update_llm_explanation(course_a: str, course_b: str, explanation: str):
+    a, b = sorted([course_a, course_b])
+    with _Conn() as cur:
+        cur.execute("""
+            UPDATE similarity_cache SET llm_explanation=%s
+            WHERE course_a=%s AND course_b=%s
+        """, (explanation, a, b))
 
 
 def drop_all():

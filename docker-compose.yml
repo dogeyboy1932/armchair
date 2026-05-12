@@ -73,7 +73,7 @@ services:
       POSTGRES_USER: siip
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-siip_local}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres:/var/lib/postgresql/data
     healthcheck:
