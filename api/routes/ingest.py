@@ -130,10 +130,10 @@ def _run_ingest_inner(course_id: str, course_name: str, raw_text: str, api_key: 
         ])
     print(f"[ingest]   ✓ {len(chunks)} chunks stored, {len(embed_chunks)} embedded in Milvus")
 
-    # ── Step 3: Store category distributions (from step 1, no extra LLM call) ─────
+    # ── Step 3: Store category distributions + tags (from step 1, no extra LLM call) ──
     for t in topics:
-        pg_store.upsert_topic_category(course_id, t['name'], t['categories'])
-    print(f"[ingest]   ✓ {len(topics)} category distributions stored")
+        pg_store.upsert_topic_category(course_id, t['name'], t['categories'], t.get('tags', []))
+    print(f"[ingest]   ✓ {len(topics)} category distributions + tags stored")
 
     # ── Steps 4 + 5: Math — similarity scoring with category vectors ──────────────
     print(f"[ingest] Steps 4-5/7 — Hybrid scoring + non_obvious_score …")
@@ -250,7 +250,7 @@ def _run_append_inner(course_id: str, course_name: str, raw_text: str, api_key: 
     topic_names = [t['name'] for t in topics]
 
     for t in topics:
-        pg_store.upsert_topic_category(course_id, t['name'], t['categories'])
+        pg_store.upsert_topic_category(course_id, t['name'], t['categories'], t.get('tags', []))
 
     # ── Step 2: Stack — chunk new material, embed, accumulate term counts ─────────
     print(f"[append] Step 2/4 — Chunking + embedding new material …")

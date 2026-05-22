@@ -54,7 +54,10 @@ def health():
 
 @app.get("/", include_in_schema=False)
 def ui():
-    return FileResponse(PUBLIC_DIR / "index.html")
+    return FileResponse(
+        PUBLIC_DIR / "index.html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"},
+    )
 
 
 @app.get("/upload", include_in_schema=False)

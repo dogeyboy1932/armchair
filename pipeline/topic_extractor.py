@@ -75,6 +75,19 @@ No fluff. Describe the intellectual content, not the logistics.
        Mathematics    — calculus, linear algebra, numerical methods, differential equations
        Chemistry      — general chemistry, physical chemistry, reactions, stoichiometry
        Systems        — control systems, signal processing, feedback, system dynamics
+   - tags: 5-10 precise buzzwords that bridge this topic to equivalent concepts in other
+     engineering or CS domains. These are used for cross-course matching — a student searching
+     "RLC circuit" should find ME340's spring-mass system because both share "second-order-ode".
+     Format: lowercase hyphenated phrases, 2-4 words each.
+     GOOD tags bridge domains — both RLC circuits AND spring-mass-dampers get "second-order-ode",
+     "natural-frequency", "damped-oscillation", "characteristic-equation", "resonance".
+     More examples: "eigenvalue-problem", "fourier-transform", "laplace-transform",
+     "conservation-of-energy", "boundary-value-problem", "state-space-model",
+     "feedback-control", "wave-propagation", "thermal-resistance", "stress-strain",
+     "dynamic-programming", "gradient-descent", "phase-equilibrium", "transfer-function".
+     BAD tags are too generic: "analysis", "method", "theory", "modeling", "equations".
+     BAD tags are too domain-locked: "kirchhoffs-law" (only circuits), "hookes-law" (only solids).
+     PREFER tags that a course in a DIFFERENT domain would legitimately also use.
 
 Topic rules:
 - Extract 5–20 topics. Skip all logistics (grading, policies, schedules, office hours).
@@ -89,7 +102,8 @@ Return ONLY raw valid JSON — no markdown, no code fences, no explanation:
     {{
       "name": "...",
       "description": "...",
-      "categories": {_CAT_SCHEMA}
+      "categories": {_CAT_SCHEMA},
+      "tags": ["...", "..."]
     }}
   ]
 }}"""
@@ -138,7 +152,9 @@ def analyze_course(course_id: str, course_name: str, text: str, client) -> dict:
         if total <= 0:
             raise ValueError(f"LLM returned all-zero categories for topic '{name}'")
         categories = {c: raw_cats.get(c, 0.0) / total for c in CATEGORIES}
-        topics.append({"name": name, "description": desc, "categories": categories})
+        raw_tags = t.get('tags', [])
+        tags = [str(tag).lower().strip() for tag in raw_tags if str(tag).strip()][:15]
+        topics.append({"name": name, "description": desc, "categories": categories, "tags": tags})
 
     if not topics:
         raise ValueError("LLM returned no topics from syllabus text")

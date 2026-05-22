@@ -102,6 +102,17 @@ _MIGRATION = """
 ALTER TABLE similarity_cache ADD COLUMN IF NOT EXISTS category_jsd      FLOAT;
 ALTER TABLE similarity_cache ADD COLUMN IF NOT EXISTS non_obvious_score  FLOAT;
 ALTER TABLE similarity_cache ADD COLUMN IF NOT EXISTS llm_explanation    TEXT;
+ALTER TABLE topic_categories  ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]';
+CREATE TABLE IF NOT EXISTS topic_explanations (
+    source_course  TEXT NOT NULL,
+    source_topic   TEXT NOT NULL,
+    target_course  TEXT NOT NULL,
+    target_topic   TEXT NOT NULL,
+    explanation    TEXT,
+    signed_by      TEXT,
+    generated_at   TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (source_course, source_topic, target_course, target_topic)
+);
 """
 
 
@@ -291,14 +302,14 @@ def get_top_non_obvious(top: int = 50, min_sem: float = 0.0) -> list[dict]:
     ]
 
 
-def upsert_topic_category(course_id: str, topic_text: str, categories: dict):
+def upsert_topic_category(course_id: str, topic_text: str, categories: dict, tags: list = None):
     with _Conn() as cur:
         cur.execute("""
-            INSERT INTO topic_categories (course_id, topic_text, categories)
-            VALUES (%s, %s, %s)
+            INSERT INTO topic_categories (course_id, topic_text, categories, tags)
+            VALUES (%s, %s, %s, %s)
             ON CONFLICT (course_id, topic_text) DO UPDATE
-            SET categories=EXCLUDED.categories, labeled_at=NOW()
-        """, (course_id, topic_text, json.dumps(categories)))
+            SET categories=EXCLUDED.categories, tags=EXCLUDED.tags, labeled_at=NOW()
+        """, (course_id, topic_text, json.dumps(categories), json.dumps(tags or [])))
 
 
 def get_topic_categories_for_course(course_id: str) -> list[dict]:
@@ -320,25 +331,101 @@ def get_topic_texts_for_course(course_id: str, limit: int = 5) -> list[str]:
         return [r[0] for r in cur.fetchall()]
 
 
+def get_course_explain_context(course_id: str, topic_limit: int = 8) -> dict:
+    """Return name, category distribution, and top topics with descriptions for LLM context."""
+    with _Conn() as cur:
+        cur.execute("SELECT name FROM courses WHERE course_id=%s", (course_id,))
+        row = cur.fetchone()
+        name = row[0] if row else course_id
+
+        cur.execute("""
+            SELECT topic_text, categories, COALESCE(tags,'[]')
+            FROM topic_categories WHERE course_id=%s
+            LIMIT %s
+        """, (course_id, topic_limit))
+        rows = cur.fetchall()
+
+    topics = [r[0] for r in rows]
+    # Aggregate category distribution across topics
+    agg: dict = {}
+    for r in rows:
+        cats = r[1] if isinstance(r[1], dict) else json.loads(r[1])
+        for k, v in cats.items():
+            agg[k] = agg.get(k, 0) + v
+    n = len(rows) or 1
+    cats_avg = {k: v / n for k, v in agg.items()}
+
+    return {"name": name, "topics": topics, "categories": cats_avg}
+
+
 def search_topics(query: str, limit: int = 40) -> list[dict]:
-    """Full-text ILIKE search over topic_text. Returns matches with categories."""
+    """Search topic text and tags. Returns matches annotated with matched_by and matched_tags."""
+    like = f'%{query}%'
     with _Conn() as cur:
         cur.execute("""
-            SELECT course_id, topic_text, categories
+            SELECT course_id, topic_text, categories, COALESCE(tags, '[]') AS tags
             FROM topic_categories
             WHERE topic_text ILIKE %s
-            ORDER BY course_id, topic_text
+               OR EXISTS (
+                   SELECT 1 FROM jsonb_array_elements_text(COALESCE(tags, '[]')) t
+                   WHERE t ILIKE %s
+               )
+            ORDER BY
+                CASE WHEN topic_text ILIKE %s THEN 0 ELSE 1 END,
+                course_id, topic_text
             LIMIT %s
-        """, (f'%{query}%', limit))
+        """, (like, like, like, limit))
         rows = cur.fetchall()
-    return [
-        {
-            'course_id':  r[0],
-            'topic_text': r[1],
-            'categories': r[2] if isinstance(r[2], dict) else json.loads(r[2]),
-        }
-        for r in rows
-    ]
+
+    results = []
+    q_lower = query.lower()
+    for r in rows:
+        tags = r[3] if isinstance(r[3], list) else json.loads(r[3])
+        text_hit = q_lower in r[1].lower()
+        matched_tags = [t for t in tags if q_lower in t] if not text_hit else []
+        results.append({
+            'course_id':   r[0],
+            'topic_text':  r[1],
+            'categories':  r[2] if isinstance(r[2], dict) else json.loads(r[2]),
+            'tags':        tags,
+            'matched_by':  'text' if text_hit else 'tag',
+            'matched_tags': matched_tags,
+        })
+    return results
+
+
+def find_related_by_tags(tags: list[str], exclude_courses: list[str]) -> list[dict]:
+    """Find topics from other courses that share any exact tag with the given tag list."""
+    if not tags or not exclude_courses:
+        return []
+    with _Conn() as cur:
+        cur.execute("""
+            SELECT course_id, topic_text, categories, COALESCE(tags, '[]') AS tags
+            FROM topic_categories
+            WHERE course_id != ALL(%s::text[])
+              AND EXISTS (
+                  SELECT 1 FROM jsonb_array_elements_text(COALESCE(tags, '[]')) t
+                  WHERE t = ANY(%s::text[])
+              )
+            ORDER BY course_id, topic_text
+            LIMIT 50
+        """, (exclude_courses, tags))
+        rows = cur.fetchall()
+
+    tag_set = set(tags)
+    results = []
+    for r in rows:
+        topic_tags = r[3] if isinstance(r[3], list) else json.loads(r[3])
+        shared = [t for t in topic_tags if t in tag_set]
+        if shared:
+            results.append({
+                'course_id':   r[0],
+                'topic_text':  r[1],
+                'categories':  r[2] if isinstance(r[2], dict) else json.loads(r[2]),
+                'tags':        topic_tags,
+                'shared_tags': shared,
+            })
+    return results
 
 
 def upsert_topic_similarities(rows: list[tuple]):
@@ -378,6 +465,29 @@ def get_similar_topics(course_id: str, topic_text: str, limit: int = 8) -> list[
             for r in rows]
 
 
+def get_topic_context(course_id: str, topic_text: str) -> dict:
+    """Fetch all available context for a topic: categories, tags, course name."""
+    with _Conn() as cur:
+        cur.execute("""
+            SELECT tc.categories, COALESCE(tc.tags,'[]'),
+                   c.name, c.description
+            FROM topic_categories tc
+            JOIN courses c ON c.course_id = tc.course_id
+            WHERE tc.course_id = %s AND tc.topic_text = %s
+        """, (course_id, topic_text))
+        row = cur.fetchone()
+    if not row:
+        return {"course_name": course_id, "categories": {}, "tags": []}
+    cats = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+    tags = row[1] if isinstance(row[1], list) else json.loads(row[1])
+    return {
+        "course_name":        row[2],
+        "course_description": row[3] or "",
+        "categories":         cats,
+        "tags":               tags,
+    }
+
+
 def update_llm_explanation(course_a: str, course_b: str, explanation: str):
     a, b = sorted([course_a, course_b])
     with _Conn() as cur:
@@ -385,6 +495,80 @@ def update_llm_explanation(course_a: str, course_b: str, explanation: str):
             UPDATE similarity_cache SET llm_explanation=%s
             WHERE course_a=%s AND course_b=%s
         """, (explanation, a, b))
+
+
+def get_course_tag_summary(course_id: str) -> dict:
+    """
+    Return aggregated unique tags for a course, sorted by how many topics carry each tag.
+    Also returns all topics with their individual tags.
+    """
+    with _Conn() as cur:
+        # Aggregate tag frequencies
+        cur.execute("""
+            SELECT t.tag, COUNT(*) AS freq
+            FROM topic_categories tc,
+                 jsonb_array_elements_text(COALESCE(tc.tags, '[]')) AS t(tag)
+            WHERE tc.course_id = %s
+            GROUP BY t.tag
+            ORDER BY freq DESC, t.tag
+        """, (course_id,))
+        tag_rows = cur.fetchall()
+
+        # All topics with their tags and descriptions
+        cur.execute("""
+            SELECT tc.topic_text, COALESCE(tc.tags,'[]'), tc.categories
+            FROM topic_categories tc
+            WHERE tc.course_id = %s
+            ORDER BY tc.topic_text
+        """, (course_id,))
+        topic_rows = cur.fetchall()
+
+    tags = [{"tag": r[0], "count": int(r[1])} for r in tag_rows]
+
+    topics = []
+    for r in topic_rows:
+        t_tags = r[1] if isinstance(r[1], list) else json.loads(r[1])
+        t_cats = r[2] if isinstance(r[2], dict) else json.loads(r[2])
+        topics.append({"topic": r[0], "tags": t_tags, "categories": t_cats})
+
+    return {"tags": tags, "topics": topics}
+
+
+def get_topic_explanation(sc: str, st: str, tc: str, tt: str) -> dict | None:
+    with _Conn() as cur:
+        cur.execute("""
+            SELECT explanation, signed_by, generated_at
+            FROM topic_explanations
+            WHERE source_course=%s AND source_topic=%s
+              AND target_course=%s AND target_topic=%s
+        """, (sc, st, tc, tt))
+        row = cur.fetchone()
+    if not row:
+        return None
+    return {"explanation": row[0], "signed_by": row[1], "generated_at": str(row[2])}
+
+
+def upsert_topic_explanation(sc: str, st: str, tc: str, tt: str,
+                              explanation: str, signed_by: str | None = None):
+    with _Conn() as cur:
+        cur.execute("""
+            INSERT INTO topic_explanations
+                (source_course, source_topic, target_course, target_topic, explanation, signed_by)
+            VALUES (%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (source_course, source_topic, target_course, target_topic) DO UPDATE SET
+                explanation  = EXCLUDED.explanation,
+                signed_by    = COALESCE(EXCLUDED.signed_by, topic_explanations.signed_by),
+                generated_at = NOW()
+        """, (sc, st, tc, tt, explanation, signed_by))
+
+
+def sign_topic_explanation(sc: str, st: str, tc: str, tt: str, signed_by: str):
+    with _Conn() as cur:
+        cur.execute("""
+            UPDATE topic_explanations SET signed_by=%s
+            WHERE source_course=%s AND source_topic=%s
+              AND target_course=%s AND target_topic=%s
+        """, (signed_by, sc, st, tc, tt))
 
 
 def drop_all():

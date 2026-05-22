@@ -35,7 +35,7 @@ def get_course_topics(course_id: str):
     )
     cur = conn.cursor()
     cur.execute(
-        "SELECT topic_text, categories FROM topic_categories WHERE course_id=%s ORDER BY topic_text",
+        "SELECT topic_text, categories, COALESCE(tags,'[]') FROM topic_categories WHERE course_id=%s ORDER BY topic_text",
         (course_id,)
     )
     rows = cur.fetchall()
@@ -44,6 +44,7 @@ def get_course_topics(course_id: str):
         {
             "topic_text": r[0],
             "categories": r[1] if isinstance(r[1], dict) else json.loads(r[1]),
+            "tags":       r[2] if isinstance(r[2], list) else json.loads(r[2]),
         }
         for r in rows
     ]

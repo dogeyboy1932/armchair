@@ -13,9 +13,21 @@ from storage                   import postgres_store as pg_store
 from storage                   import neo4j_store    as neo4j
 
 
+_SEM_FLOOR = 0.35  # SciNCL cosine baseline for random engineering text pairs
+
+
+def _calibrate_sem(raw: float) -> float:
+    """
+    Stretch SciNCL cosine similarity so that the ~0.35 baseline maps to 0.
+    Without calibration, all engineering pairs score 0.40–0.80 and the graph
+    becomes fully connected. With calibration, true outliers separate clearly.
+    """
+    return max(0.0, (raw - _SEM_FLOOR) / (1.0 - _SEM_FLOOR))
+
+
 def _hybrid(lex: float, sem: float, cat_jsd: float | None) -> float:
     """
-    Weighted combination of lex, sem, and category similarity.
+    Weighted combination of lex, calibrated_sem, and category similarity.
 
     Weights (ALPHA_LEX, ALPHA_SEM, ALPHA_CAT) are read from config and auto-normalized.
     When cat_jsd is unavailable, ALPHA_CAT is redistributed proportionally to lex and sem.
@@ -23,14 +35,15 @@ def _hybrid(lex: float, sem: float, cat_jsd: float | None) -> float:
     w_lex = config.ALPHA_LEX
     w_sem = config.ALPHA_SEM
     w_cat = config.ALPHA_CAT
+    cal   = _calibrate_sem(sem)
 
     if cat_jsd is None:
         total = w_lex + w_sem
-        return (w_lex * lex + w_sem * sem) / total
+        return (w_lex * lex + w_sem * cal) / total
     else:
         cat_sim = 1.0 - cat_jsd
         total = w_lex + w_sem + w_cat
-        return (w_lex * lex + w_sem * sem + w_cat * cat_sim) / total
+        return (w_lex * lex + w_sem * cal + w_cat * cat_sim) / total
 
 
 def score_pair(

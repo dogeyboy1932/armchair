@@ -376,22 +376,41 @@
     }
     .ex-prereqs { font-size: 0.78rem; color: #64748b; }
 
-    /* Topics list in details panel */
-    .ex-topics-head {
+    /* Collapsible section header (Tags / Topics) */
+    .ex-section-header {
+      display: flex; align-items: center; gap: 7px;
       font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.08em; color: #475569; margin: 12px 0 6px;
+      letter-spacing: 0.08em; color: #475569;
+      margin: 10px 0 0; padding: 6px 4px;
+      cursor: pointer; user-select: none; border-radius: 4px;
+      border-bottom: 1px solid #12141f;
     }
+    .ex-section-header:hover { color: #94a3b8; background: rgba(255,255,255,0.02); }
+    .ex-section-chevron { font-size: 0.55rem; transition: transform 0.15s; flex-shrink: 0; }
+    .ex-section[data-open="false"] .ex-section-chevron { transform: rotate(-90deg); }
+    .ex-section[data-open="false"] .ex-section-body   { display: none; }
+    .ex-section-body { padding-top: 4px; }
+
+    /* Topics list in details panel */
     .ex-topic-row {
-      display: flex; align-items: center; gap: 8px;
-      padding: 5px 0; border-bottom: 1px solid #12141f;
-      cursor: default;
+      display: flex; flex-direction: column;
+      border-bottom: 1px solid #12141f;
     }
     .ex-topic-row:last-child { border-bottom: none; }
-    .ex-topic-dot {
-      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+    .ex-topic-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 4px;
     }
+    .ex-topic-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .ex-topic-name { font-size: 0.78rem; color: #cbd5e1; flex: 1; }
-    .ex-topic-cat { font-size: 0.62rem; color: #475569; flex-shrink: 0; }
+    .ex-topic-cat  { font-size: 0.62rem; color: #475569; flex-shrink: 0; }
+    .ex-topic-body { padding: 2px 4px 6px 22px; }
+    .ex-topic-tags { display: flex; flex-wrap: wrap; gap: 3px; }
+    /* Course-level tag cloud in detail card */
+    .ex-course-tag-cloud { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 0 6px; }
+    .ex-course-tag { font-size: 0.6rem; padding: 2px 7px; border-radius: 3px; background: #1a1d2e; color: #475569; font-family: monospace; cursor: default; }
+    .ex-course-tag:hover { background: rgba(129,140,248,0.12); color: #818cf8; }
+    .ex-course-tag-count { font-size: 0.55rem; color: #334155; margin-left: 2px; }
 
     /* Top-K controls in the similar panel */
     .ex-controls {
@@ -438,6 +457,27 @@
     }
     .ex-expl-line { display: flex; gap: 6px; }
     .ex-expl-label { font-size: 0.63rem; font-weight: 700; color: #f97316; white-space: nowrap; padding-top: 1px; flex-shrink: 0; }
+    .ex-expl-label-surprise { color: #a78bfa; }
+    .ex-expl-line-surprise { background: rgba(167,139,250,0.05); padding: 3px 6px; border-radius: 3px; border-left: 2px solid rgba(167,139,250,0.4); margin-top: 2px; }
+    .ex-expl-actions { display: flex; gap: 5px; margin-top: 6px; }
+    .ex-expl-action-btn {
+      font-size: 0.62rem; padding: 3px 9px; border-radius: 4px; cursor: pointer;
+      border: 1px solid #1e2235; background: #13151f; color: #64748b;
+      transition: all .12s;
+    }
+    .ex-expl-action-btn:hover { color: #e2e8f0; border-color: #2d3148; }
+    .ex-expl-edit-area {
+      width: 100%; min-height: 90px; margin-top: 6px; padding: 7px 9px;
+      background: #0d0f1a; border: 1px solid #2d3148; border-radius: 4px;
+      color: #cbd5e1; font-size: 0.68rem; font-family: inherit; resize: vertical;
+      line-height: 1.5;
+    }
+    .ex-expl-edit-area:focus { outline: none; border-color: rgba(129,140,248,0.4); }
+    .ex-expl-save-btn {
+      font-size: 0.62rem; padding: 3px 10px; border-radius: 4px; cursor: pointer;
+      border: 1px solid rgba(52,211,153,0.3); background: rgba(52,211,153,0.08); color: #34d399;
+    }
+    .ex-expl-save-btn:hover { background: rgba(52,211,153,0.15); }
 
     /* ═══ TOPICS VIEW ═══ */
     .tp-search-bar {
@@ -465,32 +505,149 @@
     .tp-panel-scroll::-webkit-scrollbar { width: 4px; }
     .tp-panel-scroll::-webkit-scrollbar-thumb { background: #1e2235; border-radius: 2px; }
 
-    /* Topic result cards */
-    .tp-result-group { border-bottom: 1px solid #1a1d2e; }
-    .tp-result-group-header {
-      padding: 8px 14px 4px;
-      font-size: 0.7rem; font-weight: 700; color: #818cf8;
-      background: rgba(129,140,248,0.05);
-      position: sticky; top: 0; z-index: 1;
+    /* ── Tags ─────────────────────────────────────────── */
+    .tp-tags { display: flex; flex-wrap: wrap; gap: 3px; margin: 5px 0 2px; }
+    .tp-tag { font-size: 0.57rem; padding: 2px 6px; border-radius: 4px; background: #1e2235; color: #64748b; font-family: monospace; letter-spacing: 0.01em; border: 1px solid transparent; }
+    .tp-tag-matched { background: rgba(99,102,241,0.15); color: #a5b4fc; border-color: rgba(99,102,241,0.3); font-weight: 600; }
+    .tp-tag-shared  { background: rgba(245,158,11,0.15);  color: #fcd34d; border-color: rgba(245,158,11,0.3);  font-weight: 600; }
+    .tp-match-indicator { font-size: 0.6rem; margin: 2px 0 3px; }
+    .tp-match-text   { color: #22d3ee; }
+    .tp-match-tag    { color: #a5b4fc; }
+    .tp-match-shared { color: #fcd34d; }
+
+    /* ── Course accordion cards ───────────────────────── */
+    .tp-course-card {
+      margin: 6px 10px; border-radius: 8px; overflow: hidden;
+      border: 1px solid #1e2235;
     }
-    .tp-result-item {
-      padding: 8px 14px 10px;
-      border-bottom: 1px solid #12141f;
+    .tp-course-card-direct  { border-color: rgba(99,102,241,0.25); }
+    .tp-course-card-related { border-color: rgba(245,158,11,0.2); }
+    .tp-course-header {
+      padding: 10px 12px 9px;
+      display: flex; align-items: center; gap: 9px;
+      user-select: none; position: sticky; top: 0; z-index: 2;
     }
-    .tp-result-item:last-child { border-bottom: none; }
-    .tp-result-topic { font-size: 0.8rem; color: #cbd5e1; margin-bottom: 5px; }
-    .tp-similar-head { font-size: 0.62rem; color: #475569; margin: 7px 0 4px; letter-spacing: 0.04em; text-transform: uppercase; }
+    .tp-course-header-direct {
+      background: linear-gradient(90deg, rgba(99,102,241,0.18) 0%, rgba(99,102,241,0.06) 60%, transparent 100%);
+      border-bottom: 1px solid rgba(99,102,241,0.15);
+    }
+    .tp-course-header-related {
+      background: linear-gradient(90deg, rgba(245,158,11,0.18) 0%, rgba(245,158,11,0.06) 60%, transparent 100%);
+      border-bottom: 1px solid rgba(245,158,11,0.15);
+    }
+    .tp-course-header:hover { filter: brightness(1.12); }
+    .tp-course-chevron { font-size: 0.58rem; transition: transform 0.15s; flex-shrink: 0; cursor: pointer; padding: 2px; }
+    .tp-course-chevron-direct  { color: #818cf8; }
+    .tp-course-chevron-related { color: #f59e0b; }
+    .tp-course-card[data-open="false"] .tp-course-chevron { transform: rotate(-90deg); }
+    .tp-course-card[data-open="false"] .tp-course-body   { display: none; }
+    .tp-course-id-direct  { font-size: 0.73rem; font-weight: 700; color: #a5b4fc; flex-shrink: 0; cursor: pointer; }
+    .tp-course-id-related { font-size: 0.73rem; font-weight: 700; color: #fcd34d; flex-shrink: 0; cursor: pointer; }
+    .tp-course-id-direct:hover, .tp-course-id-related:hover { text-decoration: underline; }
+    .tp-course-name { font-size: 0.68rem; color: #64748b; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+    .tp-course-name:hover { color: #94a3b8; }
+    .tp-course-badge { font-size: 0.57rem; padding: 2px 7px; border-radius: 8px; flex-shrink: 0; font-weight: 600; }
+    .tp-course-badge-direct  { background: rgba(99,102,241,0.2);  color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
+    .tp-course-badge-related { background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.25); }
+    .tp-course-body { background: #0a0c14; }
+
+    /* ── Topic dropdown items ─────────────────────────── */
+    .tp-topic-card {
+      margin: 5px 8px; border-radius: 6px;
+      background: #0f1117; border: 1px solid #1e2235;
+      overflow: hidden;
+    }
+    .tp-topic-card:hover { border-color: #2a2d3e; }
+    .tp-topic-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; cursor: pointer; user-select: none;
+    }
+    .tp-topic-header:hover { background: rgba(255,255,255,0.02); }
+    .tp-topic-cat-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .tp-topic-name { font-size: 0.78rem; color: #cbd5e1; flex: 1; line-height: 1.35; }
+    .tp-topic-chevron { font-size: 0.55rem; color: #334155; transition: transform 0.15s; flex-shrink: 0; }
+    .tp-topic-card[data-open="false"] .tp-topic-chevron { transform: rotate(-90deg); }
+    .tp-topic-card[data-open="false"] .tp-topic-body   { display: none; }
+    .tp-topic-body { padding: 6px 10px 10px; border-top: 1px solid #12141f; }
+    .tp-topic-desc  { font-size: 0.66rem; color: #475569; line-height: 1.5; margin: 7px 0 5px; }
+    .tp-mini-bars   { display: flex; flex-direction: column; gap: 2px; margin: 6px 0 2px; }
+    .tp-mini-row    { display: flex; align-items: center; gap: 5px; }
+    .tp-mini-label  { font-size: 0.6rem; color: #334155; width: 82px; flex-shrink: 0; }
+    .tp-mini-track  { flex: 1; height: 3px; background: #1a1d2e; border-radius: 2px; overflow: hidden; }
+    .tp-mini-fill   { height: 100%; border-radius: 2px; }
+    .tp-mini-pct    { font-size: 0.58rem; color: #334155; width: 28px; text-align: right; flex-shrink: 0; }
+    .tp-similar-head { font-size: 0.6rem; color: #334155; margin: 6px 0 3px; letter-spacing: 0.04em; text-transform: uppercase; }
     .tp-similar-list { display: flex; flex-direction: column; gap: 3px; margin-bottom: 4px; }
     .tp-similar-item { display: flex; align-items: baseline; gap: 5px; }
-    .tp-similar-score { font-size: 0.62rem; color: #7c3aed; font-weight: 700; flex-shrink: 0; width: 32px; }
-    .tp-similar-cid { font-size: 0.62rem; color: #818cf8; font-weight: 600; flex-shrink: 0; }
-    .tp-similar-text { font-size: 0.68rem; color: #94a3b8; }
-    .tp-mini-bars { display: flex; flex-direction: column; gap: 2px; }
-    .tp-mini-row { display: flex; align-items: center; gap: 5px; }
-    .tp-mini-label { font-size: 0.6rem; color: #475569; width: 88px; flex-shrink: 0; }
-    .tp-mini-track { flex: 1; height: 4px; background: #1a1d2e; border-radius: 2px; overflow: hidden; }
-    .tp-mini-fill { height: 100%; border-radius: 2px; }
-    .tp-mini-pct { font-size: 0.6rem; color: #475569; width: 32px; text-align: right; flex-shrink: 0; }
+    .tp-similar-score { font-size: 0.6rem; color: #7c3aed; font-weight: 700; flex-shrink: 0; width: 30px; }
+    .tp-similar-cid   { font-size: 0.6rem; color: #818cf8; font-weight: 600; flex-shrink: 0; }
+    .tp-similar-text  { font-size: 0.66rem; color: #475569; }
+
+    /* ── Cross-domain section divider ─────────────────── */
+    .tp-related-section-header {
+      display: flex; align-items: center; gap: 8px;
+      margin: 10px 10px 4px; padding: 7px 12px;
+      font-size: 0.65rem; font-weight: 700; color: #92400e;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      background: rgba(245,158,11,0.08);
+      border: 1px solid rgba(245,158,11,0.15);
+      border-radius: 6px;
+    }
+
+    /* Detail panel (right side) */
+    .tp-detail-back { display: flex; align-items: center; gap: 5px; padding: 8px 14px; font-size: 0.65rem; color: #475569; cursor: pointer; border-bottom: 1px solid #1a1d2e; }
+    .tp-detail-back:hover { color: #94a3b8; }
+    .tp-detail-section { padding: 12px 14px; border-bottom: 1px solid #12141f; }
+    .tp-detail-title { font-size: 0.75rem; font-weight: 700; color: #cbd5e1; margin-bottom: 2px; }
+    .tp-detail-subtitle { font-size: 0.67rem; color: #475569; margin-bottom: 8px; }
+    .tp-detail-desc { font-size: 0.7rem; color: #64748b; line-height: 1.55; margin-bottom: 8px; }
+    .tp-detail-label { font-size: 0.6rem; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 5px; }
+    .tp-detail-tag-cloud { display: flex; flex-wrap: wrap; gap: 4px; }
+    .tp-detail-tag { font-size: 0.6rem; padding: 2px 7px; border-radius: 3px; background: #1a1d2e; color: #475569; font-family: monospace; cursor: default; }
+    .tp-detail-tag:hover { background: rgba(129,140,248,0.12); color: #818cf8; }
+    .tp-detail-tag-count { font-size: 0.55rem; color: #334155; margin-left: 3px; }
+    .tp-detail-topic-row { padding: 6px 0; border-bottom: 1px solid #12141f; }
+    .tp-detail-topic-row:last-child { border-bottom: none; }
+    .tp-detail-topic-name { font-size: 0.72rem; color: #94a3b8; margin-bottom: 3px; cursor: pointer; }
+    .tp-detail-topic-name:hover { color: #cbd5e1; }
+    .tp-detail-topic-desc { font-size: 0.62rem; color: #334155; line-height: 1.4; margin-bottom: 3px; }
+    .tp-selected-tag { background: rgba(129,140,248,0.2) !important; color: #818cf8 !important; }
+    /* Explain / sign UI */
+    .tp-explain-btn {
+      margin-top: 7px;
+      font-size: 0.62rem; padding: 3px 10px; border-radius: 4px;
+      background: transparent; border: 1px solid rgba(249,115,22,0.35);
+      color: #f97316; cursor: pointer;
+    }
+    .tp-explain-btn:hover { background: rgba(249,115,22,0.08); }
+    .tp-explain-btn:disabled { opacity: 0.45; cursor: default; }
+    .tp-explanation-box {
+      margin-top: 8px; padding: 8px 10px;
+      background: rgba(249,115,22,0.06); border-left: 2px solid #f97316;
+      border-radius: 0 4px 4px 0;
+    }
+    .tp-explanation-line { font-size: 0.68rem; color: #cbd5e1; margin-bottom: 4px; line-height: 1.45; }
+    .tp-explanation-label { font-weight: 700; color: #f97316; }
+    .tp-sign-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+    .tp-sign-input {
+      flex: 1; font-size: 0.65rem; padding: 3px 7px; border-radius: 4px;
+      background: #1a1d2e; border: 1px solid rgba(255,255,255,0.1);
+      color: #cbd5e1; outline: none;
+    }
+    .tp-sign-btn {
+      font-size: 0.62rem; padding: 3px 9px; border-radius: 4px;
+      background: rgba(129,140,248,0.12); border: 1px solid rgba(129,140,248,0.3);
+      color: #818cf8; cursor: pointer;
+    }
+    .tp-sign-btn:hover { background: rgba(129,140,248,0.22); }
+    .tp-signed-by { font-size: 0.6rem; color: #64748b; margin-top: 4px; }
+    .tp-expl-context { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+    .tp-expl-ctx-card { padding: 6px 8px; background: #111827; border: 1px solid #1e2235; border-radius: 4px; }
+    .tp-expl-ctx-course { font-size: 0.62rem; font-weight: 700; color: #818cf8; margin-bottom: 2px; }
+    .tp-expl-ctx-topic  { font-size: 0.7rem;  color: #cbd5e1; margin-bottom: 3px; }
+    .tp-expl-ctx-desc   { font-size: 0.62rem; color: #475569; line-height: 1.4; margin-bottom: 3px; }
+    .tp-expl-ctx-cats   { font-size: 0.58rem; color: #334155; margin-bottom: 2px; }
+    .tp-expl-ctx-tags   { display: flex; flex-wrap: wrap; gap: 2px; }
 
     /* Matching matrix */
     .tp-matrix-wrap { padding: 14px; }
@@ -547,10 +704,11 @@
     .ex-similar-item {
       padding: 11px 14px;
       border-bottom: 1px solid #1a1d2e;
-      transition: background .1s;
+      transition: background .12s, border-color .12s;
+      cursor: pointer;
     }
     .ex-similar-item:last-child { border-bottom: none; }
-    .ex-similar-item:hover { background: #111420; }
+    .ex-similar-item:hover { background: rgba(129,140,248,0.05); border-color: rgba(129,140,248,0.15); }
 
     .ex-similar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
     .ex-similar-name { flex: 1; font-size: 0.82rem; color: #cbd5e1; font-weight: 500; }
@@ -625,7 +783,6 @@
       gap: 10px; margin-bottom: 20px;
       padding-bottom: 18px; border-bottom: 1px solid #1e2235;
     }
-    .modal-meta-item {}
     .modal-meta-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; margin-bottom: 4px; }
     .modal-meta-value { font-size: 0.9rem; font-weight: 700; color: #e2e8f0; }
 
@@ -676,8 +833,8 @@
   <div class="toolbar">
     <div class="toolbar-group">
       <label>Min similarity</label>
-      <input type="range" id="threshold" min="0.3" max="0.95" step="0.05" value="0.5" />
-      <span class="val-badge" id="threshold-val">0.50</span>
+      <input type="range" id="threshold" min="0.4" max="0.95" step="0.05" value="0.65" />
+      <span class="val-badge" id="threshold-val">0.65</span>
       <button class="btn btn-ghost" id="btn-reload">Reload</button>
     </div>
     <div class="toolbar-group">
@@ -824,7 +981,11 @@
 <div id="tooltip"></div>
 
 <script>
-const API = 'http://localhost:8080';
+// Use an empty string for relative paths when served by the backend, 
+  // or a fallback to a production API URL when hosted statically on Netlify.
+  const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:8080' 
+    : 'https://siip-api.onrender.com'; // TODO: Update with your production backend URL
 
 /* ═══════════════════════════════════════════════════════
    API KEY MANAGEMENT
@@ -1189,19 +1350,36 @@ const CAT_COLORS = {
 };
 const CAT_ORDER = ['Mechanics','Thermodynamics','Electrical','Fluids','Materials','Mathematics','Chemistry','Systems'];
 
-function renderExplanation(text) {
+function renderExplanation(text, showSurprise = true, opts = {}) {
   if (!text) return '';
   const lines = text.split('\n').filter(Boolean);
   const rendered = lines.map(line => {
     const colon = line.indexOf(':');
-    if (colon > 0 && colon < 25) {
+    if (colon > 0 && colon < 30) {
       const label = line.slice(0, colon).trim();
       const body  = line.slice(colon + 1).trim();
+      const isSurprise = label.toLowerCase().includes('non-obvious') || label.toLowerCase().includes('surprise');
+      if (isSurprise) {
+        if (!showSurprise) return '';
+        return `<div class="ex-expl-line ex-expl-line-surprise">
+          <span class="ex-expl-label ex-expl-label-surprise">◈ ${esc(label)}</span>
+          <span style="color:#c4b5fd">${esc(body)}</span></div>`;
+      }
       return `<div class="ex-expl-line"><span class="ex-expl-label">${esc(label)}</span><span>${esc(body)}</span></div>`;
     }
-    return `<div>${esc(line)}</div>`;
+    return `<div style="font-size:0.72rem;color:#94a3b8">${esc(line)}</div>`;
   }).join('');
-  return `<div class="ex-explanation-body">${rendered}</div>`;
+
+  let actionsHtml = '';
+  if (opts.regenFn || opts.editFn) {
+    const regenBtn = opts.regenFn
+      ? `<button class="ex-expl-action-btn" onclick="${opts.regenFn}">↺ Regenerate</button>` : '';
+    const editBtn = opts.editFn
+      ? `<button class="ex-expl-action-btn" onclick="${opts.editFn}">✎ Edit</button>` : '';
+    actionsHtml = `<div class="ex-expl-actions">${regenBtn}${editBtn}</div>`;
+  }
+
+  return `<div class="ex-explanation-body">${rendered}${actionsHtml}</div>`;
 }
 
 async function fetchCatDist(courseId) {
@@ -1226,6 +1404,14 @@ function renderCatBars(cats) {
       <div class="cat-bar-pct">${pct}%</div>
     </div>`;
   }).join('');
+}
+
+function exToggleSection(section) {
+  section.dataset.open = section.dataset.open === 'true' ? 'false' : 'true';
+}
+
+function exToggleTopic(row) {
+  row.dataset.open = row.dataset.open === 'true' ? 'false' : 'true';
 }
 
 function exSetSort(mode) {
@@ -1300,8 +1486,22 @@ function exSelectCourse(courseId) {
       <div class="cat-dist-title">Category Composition</div>
       <div id="ex-cat-placeholder" style="color:#334155;font-size:.72rem;padding:4px 0;">Loading…</div>
     </div>
-    ${course.description ? `<details style="margin-top:10px;"><summary style="font-size:.72rem;color:#475569;cursor:pointer;user-select:none;">Description ▸</summary><p class="ex-description">${esc(course.description)}</p></details>` : ''}
-    ${course.prereqs ? `<div class="ex-prereqs-label" style="margin-top:8px;">Prerequisites</div><div class="ex-prereqs">${esc(course.prereqs)}</div>` : ''}
+    ${course.description ? `
+    <div class="ex-section" data-open="false">
+      <div class="ex-section-header" onclick="exToggleSection(this.parentElement)">
+        <span class="ex-section-chevron">▼</span>
+        Description
+      </div>
+      <div class="ex-section-body"><p class="ex-description">${esc(course.description)}</p></div>
+    </div>` : ''}
+    ${course.prereqs ? `
+    <div class="ex-section" data-open="false">
+      <div class="ex-section-header" onclick="exToggleSection(this.parentElement)">
+        <span class="ex-section-chevron">▼</span>
+        Prerequisites
+      </div>
+      <div class="ex-section-body"><div class="ex-prereqs">${esc(course.prereqs)}</div></div>
+    </div>` : ''}
   </div>`;
 
   detailsBody.innerHTML = html;
@@ -1331,18 +1531,61 @@ function exSelectCourse(courseId) {
         return best;
       };
 
-      let thtml = `<div class="ex-topics-head">Topics (${topics.length})</div>`;
+      // Aggregate course-level tag frequencies
+      const tagFreq = {};
+      topics.forEach(t => {
+        (t.tags || []).forEach(tag => { tagFreq[tag] = (tagFreq[tag] || 0) + 1; });
+      });
+      const sortedTags = Object.entries(tagFreq).sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]));
+
+      // Course-level tag cloud — collapsible section
+      if (sortedTags.length) {
+        const maxFreq = sortedTags[0][1];
+        const tagCloudHtml = sortedTags.map(([tag, cnt]) => {
+          const op = (0.4 + (cnt / maxFreq) * 0.6).toFixed(2);
+          return `<span class="ex-course-tag" style="opacity:${op}" title="${cnt} topic${cnt>1?'s':''}">${esc(tag)}<span class="ex-course-tag-count">${cnt}</span></span>`;
+        }).join('');
+        card.insertAdjacentHTML('beforeend',
+          `<div class="ex-section" data-open="true">
+             <div class="ex-section-header" onclick="exToggleSection(this.parentElement)">
+               <span class="ex-section-chevron">▼</span>
+               Course Tags (${sortedTags.length} unique)
+             </div>
+             <div class="ex-section-body">
+               <div class="ex-course-tag-cloud">${tagCloudHtml}</div>
+             </div>
+           </div>`
+        );
+      }
+
+      // Topics list — collapsible section, flat rows inside
+      let topicRows = '';
       topics.forEach(t => {
         const cat  = domCat(t.categories || {});
         const col  = cat ? (CAT_COLORS[cat] || '#475569') : '#475569';
         const pct  = cat && t.categories[cat] ? Math.round(t.categories[cat] * 100) : '';
-        thtml += `<div class="ex-topic-row">
-          <div class="ex-topic-dot" style="background:${col}"></div>
-          <div class="ex-topic-name">${esc(t.topic_text)}</div>
-          ${cat ? `<div class="ex-topic-cat">${esc(cat)} ${pct ? pct+'%' : ''}</div>` : ''}
+        const topicTagHtml = (t.tags || []).map(tag =>
+          `<span class="tp-tag">${esc(tag)}</span>`
+        ).join('');
+        topicRows += `<div class="ex-topic-row">
+          <div class="ex-topic-header">
+            <div class="ex-topic-dot" style="background:${col}"></div>
+            <div class="ex-topic-name">${esc(t.topic_text)}</div>
+            ${cat ? `<div class="ex-topic-cat">${esc(cat)} ${pct ? pct+'%' : ''}</div>` : ''}
+          </div>
+          ${topicTagHtml ? `<div class="ex-topic-body"><div class="ex-topic-tags">${topicTagHtml}</div></div>` : ''}
         </div>`;
       });
-      card.insertAdjacentHTML('beforeend', thtml);
+
+      card.insertAdjacentHTML('beforeend',
+        `<div class="ex-section" data-open="true">
+           <div class="ex-section-header" onclick="exToggleSection(this.parentElement)">
+             <span class="ex-section-chevron">▼</span>
+             Topics (${topics.length})
+           </div>
+           <div class="ex-section-body">${topicRows}</div>
+         </div>`
+      );
     });
 
   // Load similar
@@ -1423,19 +1666,22 @@ function exRenderSimilar(sourceCourseId, neighbors) {
       ? `<span class="ex-score-bar-item"><span class="ex-bar-dot ex-bar-dot-nonob"></span>Cat. div. ${catJsdPct}%</span>`
       : '';
     const explId = `expl-${connId}`;
+    const explBodyId = `expl-body-${connId}`;
+    if (n.llm_explanation) exRawCache[`${sourceCourseId}|${n.course_id}`] = n.llm_explanation;
     const explanationHtml = n.llm_explanation
-      ? `<details class="ex-explanation"><summary>${explLabel}</summary>${renderExplanation(n.llm_explanation)}</details>`
+      ? `<details class="ex-explanation"><summary>${explLabel}</summary>
+          <div id="${explBodyId}">${renderExplanation(n.llm_explanation, exSortMode === 'non_obvious', {
+            regenFn: `exRegenExpl('${esc(sourceCourseId)}','${esc(n.course_id)}','${explBodyId}')`,
+            editFn:  `exEditExpl('${esc(sourceCourseId)}','${esc(n.course_id)}','${explBodyId}',this)`,
+          })}</div>
+         </details>`
       : `<div id="${explId}"><button class="ex-expl-btn" data-a="${esc(sourceCourseId)}" data-b="${esc(n.course_id)}" data-target="${explId}">✦ ${explLabel}</button></div>`;
 
-    html += `<div class="ex-similar-item">
+    html += `<div class="ex-similar-item" data-conn="${connId}" style="cursor:pointer">
       <div class="ex-similar-row">
         <span class="ex-similar-name">${esc(n.course_id)} — ${esc(nName)}</span>
         ${nonObBadge}
         <span class="ex-score-badge ${cls}">${scorePct}%</span>
-        <svg class="ex-lightbulb" data-conn="${connId}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-        </svg>
       </div>
       <div class="ex-score-bars">
         <span class="ex-score-bar-item"><span class="ex-bar-dot ex-bar-dot-lex"></span>Lexical ${lexPct}%</span>
@@ -1443,16 +1689,15 @@ function exRenderSimilar(sourceCourseId, neighbors) {
         ${catBar}
       </div>
       ${chips ? `<div class="ex-term-chips" style="margin-top:4px;">${chips}</div>` : ''}
-      ${explanationHtml}
+      <div onclick="event.stopPropagation()">${explanationHtml}</div>
     </div>`;
   });
 
   body.innerHTML = html;
 
-  body.querySelectorAll('.ex-lightbulb').forEach(icon => {
-    icon.addEventListener('click', e => {
-      e.stopPropagation();
-      const d = exConnMap[icon.dataset.conn];
+  body.querySelectorAll('.ex-similar-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const d = exConnMap[item.dataset.conn];
       if (d) openDtModal(sourceCourseId, d);
     });
   });
@@ -1486,9 +1731,14 @@ function exRenderSimilar(sourceCourseId, neighbors) {
         const expl = data.llm_explanation || '';
         const container = document.getElementById(targetId);
         if (container && expl) {
+          const bodyId = `${targetId}-body`;
+          exRawCache[`${a}|${b}`] = expl;
           container.outerHTML = `<details class="ex-explanation" open>
             <summary>${label}</summary>
-            ${renderExplanation(expl)}
+            <div id="${bodyId}">${renderExplanation(expl, exSortMode === 'non_obvious', {
+              regenFn: `exRegenExpl('${esc(a)}','${esc(b)}','${bodyId}')`,
+              editFn:  `exEditExpl('${esc(a)}','${esc(b)}','${bodyId}',this)`,
+            })}</div>
           </details>`;
           Object.values(exConnMap).forEach(c => {
             if (c.courseId === b) c.llmExplanation = expl;
@@ -1524,10 +1774,25 @@ async function openDtModal(sourceCourseId, d) {
         <div class="modal-meta-value" style="color:#f97316">${(d.categoryJsd*100).toFixed(1)}%</div>
        </div>`
     : '';
+  const llmSectionId = `modal-expl-${Date.now()}`;
   const llmSection = d.llmExplanation
-    ? `<div class="modal-terms-label" style="margin-top:18px;">Why Non-obvious?</div>
-       ${renderExplanation(d.llmExplanation)}`
-    : '';
+    ? `<div class="modal-terms-label" style="margin-top:18px;">Connection</div>
+       <div id="${llmSectionId}">${renderExplanation(d.llmExplanation, exSortMode === 'non_obvious', {
+         regenFn: `exRegenExpl('${esc(sourceCourseId)}','${esc(d.courseId)}','${llmSectionId}')`,
+         editFn:  `exEditExpl('${esc(sourceCourseId)}','${esc(d.courseId)}','${llmSectionId}',this)`,
+       })}</div>`
+    : `<div class="modal-terms-label" style="margin-top:18px;">Connection</div>
+       <div id="${llmSectionId}">
+         <div id="${llmSectionId}-btn">
+           <button class="ex-expl-btn" style="margin-top:4px"
+             data-a="${esc(d.courseId ? sourceCourseId : '')}"
+             data-b="${esc(d.courseId || '')}"
+             data-target="${llmSectionId}-btn"
+             onclick="dtModalGenerate(this,'${esc(sourceCourseId)}','${esc(d.courseId||'')}','${llmSectionId}')">
+             ✦ Generate explanation
+           </button>
+         </div>
+       </div>`;
 
   document.getElementById('dt-modal-body').innerHTML = `
     <div class="modal-meta" style="grid-template-columns:repeat(${d.nonObviousScore != null ? 6 : 4}, 1fr)">
@@ -1582,6 +1847,32 @@ async function openDtModal(sourceCourseId, d) {
   }
 }
 
+async function dtModalGenerate(btn, courseA, courseB, sectionId) {
+  const key = getApiKey();
+  if (!key) { toggleKeyPanel(); btn.textContent = '⚙ Set API key first ↑'; return; }
+  btn.disabled = true;
+  btn.textContent = '✦ Generating…';
+  try {
+    const resp = await fetch(
+      `${API}/similarity/explain?a=${encodeURIComponent(courseA)}&b=${encodeURIComponent(courseB)}`,
+      { headers: { 'X-Api-Key': key } }
+    );
+    const data = await resp.json();
+    if (!resp.ok) { btn.disabled=false; btn.textContent=`✦ Error: ${data.detail||resp.statusText}`; return; }
+    const expl = data.llm_explanation || '';
+    const container = document.getElementById(sectionId);
+    if (container && expl) {
+      exRawCache[`${courseA}|${courseB}`] = expl;
+      container.innerHTML = renderExplanation(expl, exSortMode === 'non_obvious', {
+        regenFn: `exRegenExpl('${esc(courseA)}','${esc(courseB)}','${sectionId}')`,
+        editFn:  `exEditExpl('${esc(courseA)}','${esc(courseB)}','${sectionId}',this)`,
+      });
+    } else if (container) {
+      btn.disabled=false; btn.textContent='✦ Generate explanation';
+    }
+  } catch (err) { btn.disabled=false; btn.textContent=`✦ Error: ${err.message}`; }
+}
+
 function closeDtModal(event) {
   if (event && event.target !== document.getElementById('dt-modal')) return;
   document.getElementById('dt-modal').classList.remove('active');
@@ -1613,6 +1904,95 @@ exTopkEl.addEventListener('change', () => {
 function esc(str) {
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Course-level explanation: edit/regen helpers ── */
+async function exRegenExpl(courseA, courseB, containerId) {
+  const key = getApiKey();
+  if (!key) { toggleKeyPanel(); return; }
+  const container = document.getElementById(containerId);
+  if (container) container.innerHTML = `<span style="color:#475569;font-size:.7rem">↺ Regenerating…</span>`;
+  try {
+    const resp = await fetch(
+      `${API}/similarity/explain?a=${encodeURIComponent(courseA)}&b=${encodeURIComponent(courseB)}&force=true`,
+      { headers: { 'X-Api-Key': key } }
+    );
+    const data = await resp.json();
+    if (!resp.ok) { if (container) container.textContent = `Error: ${data.detail || resp.statusText}`; return; }
+    const expl = data.llm_explanation || '';
+    if (container && expl) {
+      container.innerHTML = renderExplanation(expl, exSortMode === 'non_obvious', {
+        regenFn: `exRegenExpl('${esc(courseA)}','${esc(courseB)}','${containerId}')`,
+        editFn:  `exEditExpl('${esc(courseA)}','${esc(courseB)}','${containerId}',this)`,
+      });
+      Object.values(exConnMap).forEach(c => { if (c.courseId === courseB) c.llmExplanation = expl; });
+    }
+  } catch (err) { if (container) container.textContent = `Error: ${err.message}`; }
+}
+
+function exEditExpl(courseA, courseB, containerId, btn) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const body = container.querySelector('.ex-explanation-body');
+  const currentText = body
+    ? [...body.querySelectorAll('.ex-expl-line, .ex-expl-line-surprise, [style*="color:#94a3b8"]')]
+        .map(el => {
+          const lbl = el.querySelector('.ex-expl-label');
+          if (lbl) return lbl.textContent.replace(/◈\s*/, '') + ': ' + (el.lastChild?.textContent || '').trim();
+          return el.textContent.trim();
+        }).filter(Boolean).join('\n')
+    : '';
+  container.innerHTML = `
+    <textarea class="ex-expl-edit-area" id="${containerId}-ta">${currentText}</textarea>
+    <div class="ex-expl-actions">
+      <button class="ex-expl-save-btn" onclick="exSaveExpl('${esc(courseA)}','${esc(courseB)}','${containerId}')">✓ Save</button>
+      <button class="ex-expl-action-btn" onclick="exRegenExpl('${esc(courseA)}','${esc(courseB)}','${containerId}')">↺ Regenerate</button>
+      <button class="ex-expl-action-btn" onclick="exCancelEdit('${esc(courseA)}','${esc(courseB)}','${containerId}')">✕ Cancel</button>
+    </div>`;
+}
+
+function _exRawText(courseA, courseB) {
+  const key = `${courseA}|${courseB}`;
+  return exRawCache[key] || '';
+}
+const exRawCache = {};
+
+async function exCancelEdit(courseA, courseB, containerId) {
+  const raw = exRawCache[`${courseA}|${courseB}`];
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  if (raw) {
+    container.innerHTML = renderExplanation(raw, exSortMode === 'non_obvious', {
+      regenFn: `exRegenExpl('${esc(courseA)}','${esc(courseB)}','${containerId}')`,
+      editFn:  `exEditExpl('${esc(courseA)}','${esc(courseB)}','${containerId}',this)`,
+    });
+  } else {
+    container.innerHTML = `<span style="color:#475569;font-size:.7rem">No cached text.</span>`;
+  }
+}
+
+async function exSaveExpl(courseA, courseB, containerId) {
+  const ta = document.getElementById(`${containerId}-ta`);
+  if (!ta) return;
+  const text = ta.value.trim();
+  if (!text) return;
+  try {
+    const resp = await fetch(`${API}/similarity/explanation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ a: courseA, b: courseB, explanation: text }),
+    });
+    if (!resp.ok) { alert('Save failed'); return; }
+    exRawCache[`${courseA}|${courseB}`] = text;
+    const container = document.getElementById(containerId);
+    if (container) {
+      container.innerHTML = renderExplanation(text, exSortMode === 'non_obvious', {
+        regenFn: `exRegenExpl('${esc(courseA)}','${esc(courseB)}','${containerId}')`,
+        editFn:  `exEditExpl('${esc(courseA)}','${esc(courseB)}','${containerId}',this)`,
+      });
+    }
+    Object.values(exConnMap).forEach(c => { if (c.courseId === courseB) c.llmExplanation = text; });
+  } catch (err) { alert(`Save failed: ${err.message}`); }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1650,64 +2030,542 @@ async function tpSearch(q) {
   }
 }
 
-function tpRenderResults(data) {
-  const { matches, courses } = data;
-  const countEl = document.getElementById('tp-count');
-  countEl.textContent = matches.length ? `${matches.length} topic${matches.length > 1 ? 's' : ''} in ${courses.length} course${courses.length > 1 ? 's' : ''}` : '';
+/* ── topic search state (used by explain/sign handlers) ── */
+let _tpLastQuery   = '';
+let _tpLastMatches = [];
+let _tpLastSearch  = null;
 
-  if (!matches.length) {
+function tpRenderResults(data) {
+  const { matches, related, courses } = data;
+  _tpLastQuery   = data.query || '';
+  _tpLastMatches = matches;
+  _tpLastSearch  = data;
+
+  // Reset right panel header when new search runs
+  document.getElementById('tp-matrix-panel').querySelector('.tp-panel-head').textContent = 'Course Matchings';
+
+  const countEl = document.getElementById('tp-count');
+  const directCount  = matches.length;
+  const relatedCount = related ? related.length : 0;
+
+  if (!directCount && !relatedCount) {
+    countEl.textContent = '';
     document.getElementById('tp-results').innerHTML =
       '<div class="ex-empty" style="padding-top:60px;"><p style="font-size:.8rem;color:#334155;">No topics found</p></div>';
     return;
   }
 
-  // Group by course_id
+  countEl.textContent = `${directCount} match${directCount !== 1 ? 'es' : ''}`
+    + (relatedCount ? ` · ${relatedCount} cross-domain` : '');
+
+  /* Render category mini-bars */
+  function renderBars(cats) {
+    return CAT_ORDER.map(c => [c, cats[c] || 0])
+      .sort((a, b) => b[1] - a[1])
+      .filter(([, v]) => v >= 0.02)
+      .map(([cat, val]) => {
+        const w = Math.round(val * 100);
+        return `<div class="tp-mini-row">
+          <div class="tp-mini-label">${cat}</div>
+          <div class="tp-mini-track"><div class="tp-mini-fill" style="width:${w}%;background:${CAT_COLORS[cat]}"></div></div>
+          <div class="tp-mini-pct">${w}%</div>
+        </div>`;
+      }).join('');
+  }
+
+  /* Render a single topic card (collapsible dropdown) */
+  function renderTopicItem(m, isRelated, sourceTopic) {
+    const tags      = m.tags || [];
+    const highlight = new Set(isRelated ? (m.shared_tags || []) : (m.matched_tags || []));
+    const tagCls    = isRelated ? 'tp-tag-shared' : 'tp-tag-matched';
+    const tagsHtml  = tags.length
+      ? `<div class="tp-tags">${tags.map(t =>
+          `<span class="${highlight.has(t) ? 'tp-tag ' + tagCls : 'tp-tag'}">${esc(t)}</span>`
+        ).join('')}</div>` : '';
+
+    let indicator = '';
+    if (!isRelated && m.matched_by === 'tag' && highlight.size)
+      indicator = `<div class="tp-match-indicator tp-match-tag">↳ via tag: ${[...highlight].map(esc).join(', ')}</div>`;
+    else if (isRelated && highlight.size)
+      indicator = `<div class="tp-match-indicator tp-match-shared">⇔ shared: ${[...highlight].map(esc).join(', ')}</div>`;
+
+    let similarHtml = '';
+    if (!isRelated && m.topic_matches && m.topic_matches.length) {
+      similarHtml = `<div class="tp-similar-head">Similar topics in other courses</div>
+        <div class="tp-similar-list">${m.topic_matches.map(t =>
+          `<div class="tp-similar-item">
+            <span class="tp-similar-score">${(t.sem_score*100).toFixed(0)}%</span>
+            <span class="tp-similar-cid">${esc(t.course_id)}</span>
+            <span class="tp-similar-text">${esc(t.topic_text)}</span>
+          </div>`).join('')}</div>`;
+    }
+
+    let explainHtml = '';
+    if (isRelated && sourceTopic) {
+      const uid = `expl-${CSS.escape(m.course_id + '-' + m.topic_text)}`;
+      const ctxData = JSON.stringify({
+        sc: sourceTopic.course_id, st: sourceTopic.topic_text,
+        sdesc: (sourceTopic.description || '').slice(0, 200),
+        stags: sourceTopic.tags || [], scats: sourceTopic.categories || {},
+        tc: m.course_id, tt: m.topic_text,
+        tdesc: (m.description || '').slice(0, 200),
+        ttags: tags, tcats: m.categories || {},
+        shared: m.shared_tags || [],
+      }).replace(/'/g, "&#39;");
+      explainHtml = `<div id="${uid}" style="margin-top:6px">
+        <button class="tp-explain-btn"
+          data-ctx='${ctxData}'
+          data-uid="${uid}"
+          onclick="tpExplain(this)">✦ Explain this connection</button>
+      </div>`;
+    }
+
+    const descHtml = m.description
+      ? `<div class="tp-topic-desc">${esc(m.description.slice(0, 200))}${m.description.length > 200 ? '…' : ''}</div>` : '';
+
+    const cats = m.categories || {};
+    const topCat = Object.entries(cats).sort((a, b) => b[1] - a[1])[0];
+    const dotColor = topCat ? (CAT_COLORS[topCat[0]] || '#334155') : '#334155';
+
+    const detailBtn = `<button class="tp-explain-btn" style="margin-top:4px;background:rgba(99,102,241,0.07);color:#818cf8;border-color:rgba(99,102,241,0.2)"
+      onclick="tpShowTopicDetail(${JSON.stringify(m).replace(/"/g,'&quot;')})">↗ Full detail</button>`;
+
+    return `<div class="tp-topic-card" data-open="false">
+      <div class="tp-topic-header" onclick="tpToggleTopic(this)">
+        <div class="tp-topic-cat-dot" style="background:${dotColor}"></div>
+        <div class="tp-topic-name">${esc(m.topic_text)}</div>
+        <span class="tp-topic-chevron">▼</span>
+      </div>
+      <div class="tp-topic-body">
+        ${descHtml}${indicator}${tagsHtml}
+        <div class="tp-mini-bars">${renderBars(cats)}</div>
+        ${similarHtml}${explainHtml}
+        ${detailBtn}
+      </div>
+    </div>`;
+  }
+
+  /* Build accordion card for a group of topics */
+  function renderCourseCard(cid, items, isRelated, open, sourceTopic) {
+    const course   = exAllCourses.find(c => c.course_id === cid);
+    const name     = course ? course.name : cid;
+    const variant  = isRelated ? 'related' : 'direct';
+    const badge    = isRelated
+      ? `<span class="tp-course-badge tp-course-badge-related">${items.length} topic${items.length>1?'s':''} · ${Math.max(...items.map(r=>r.shared_tags?.length||0))} shared tags</span>`
+      : `<span class="tp-course-badge tp-course-badge-direct">${items.length} match${items.length>1?'es':''}</span>`;
+    return `<div class="tp-course-card tp-course-card-${variant}" data-open="${open}">
+      <div class="tp-course-header tp-course-header-${variant}" onclick="tpToggleCourse(this)">
+        <span class="tp-course-chevron tp-course-chevron-${variant}">▼</span>
+        <span class="tp-course-id-${variant}" onclick="event.stopPropagation();tpShowCourseDetail('${esc(cid)}')" title="View course details">${esc(cid)}</span>
+        <span class="tp-course-name" onclick="event.stopPropagation();tpShowCourseDetail('${esc(cid)}')">${esc(name)}</span>
+        ${badge}
+      </div>
+      <div class="tp-course-body">
+        ${items.map(m => renderTopicItem(m, isRelated, sourceTopic)).join('')}
+      </div>
+    </div>`;
+  }
+
+  let html = '';
+
+  /* Phase 1 — direct matches, grouped by course, open by default so topics are visible */
   const grouped = {};
   matches.forEach(m => {
     if (!grouped[m.course_id]) grouped[m.course_id] = [];
     grouped[m.course_id].push(m);
   });
+  const directCourses = [...new Set(matches.map(m => m.course_id))];
+  for (const cid of directCourses)
+    html += renderCourseCard(cid, grouped[cid], false, true, null);
 
-  let html = '';
-  for (const cid of courses) {
-    const items = grouped[cid] || [];
-    const course = exAllCourses.find(c => c.course_id === cid);
-    const name   = course ? course.name : cid;
-    html += `<div class="tp-result-group">
-      <div class="tp-result-group-header">${esc(cid)} — ${esc(name)}</div>`;
-    items.forEach(m => {
-      const cats = m.categories || {};
-      const sorted = CAT_ORDER.map(c => [c, cats[c] || 0]).sort((a, b) => b[1] - a[1]);
-      const bars = sorted.filter(([, v]) => v >= 0.02).map(([cat, val]) => {
-        const w = Math.round(val * 100);
-        return `<div class="tp-mini-row">
-          <div class="tp-mini-label">${cat}</div>
-          <div class="tp-mini-track"><div class="tp-mini-fill" style="width:${w}%;background:${CAT_COLORS[cat]}"></div></div>
-          <div class="tp-mini-pct">${(val*100).toFixed(0)}%</div>
-        </div>`;
-      }).join('');
-      // Semantic topic matches from other courses
-      let similarHtml = '';
-      if (m.topic_matches && m.topic_matches.length) {
-        const rows = m.topic_matches.map(t =>
-          `<div class="tp-similar-item">
-            <span class="tp-similar-score">${(t.sem_score * 100).toFixed(0)}%</span>
-            <span class="tp-similar-cid">${esc(t.course_id)}</span>
-            <span class="tp-similar-text">${esc(t.topic_text)}</span>
-          </div>`
-        ).join('');
-        similarHtml = `<div class="tp-similar-head">Similar topics in other courses</div>
-          <div class="tp-similar-list">${rows}</div>`;
-      }
-      html += `<div class="tp-result-item">
-        <div class="tp-result-topic">${esc(m.topic_text)}</div>
-        ${similarHtml}
-        <div class="tp-mini-bars">${bars}</div>
-      </div>`;
+  /* Phase 2 — cross-domain, grouped + ranked by shared tag count, collapsed by default */
+  if (related && related.length) {
+    html += `<div class="tp-related-section-header">⇔ &nbsp;Cross-domain connections via shared tags</div>`;
+
+    /* Pick the best source topic per shared tag (most-shared-tags direct match topic) */
+    const bestSource = matches.reduce((best, m) =>
+      !best || (m.tags?.length || 0) > (best.tags?.length || 0) ? m : best, null);
+
+    const relGrouped = {};
+    related.forEach(r => {
+      if (!relGrouped[r.course_id]) relGrouped[r.course_id] = [];
+      relGrouped[r.course_id].push(r);
     });
-    html += `</div>`;
+    /* Rank each topic within course by # shared tags desc */
+    Object.values(relGrouped).forEach(items =>
+      items.sort((a, b) => (b.shared_tags?.length || 0) - (a.shared_tags?.length || 0)));
+    /* Rank courses by total shared-tag count desc */
+    const relCourses = Object.keys(relGrouped).sort((a, b) => {
+      const sa = relGrouped[a].reduce((s, r) => s + (r.shared_tags?.length || 0), 0);
+      const sb = relGrouped[b].reduce((s, r) => s + (r.shared_tags?.length || 0), 0);
+      return sb - sa;
+    });
+    for (const cid of relCourses)
+      html += renderCourseCard(cid, relGrouped[cid], true, false, bestSource);
   }
+
   document.getElementById('tp-results').innerHTML = html;
+}
+
+function tpToggleCourse(header) {
+  const card = header.closest('.tp-course-card');
+  if (card) card.dataset.open = card.dataset.open === 'true' ? 'false' : 'true';
+}
+
+function tpToggleTopic(header) {
+  const card = header.closest('.tp-topic-card');
+  if (card) card.dataset.open = card.dataset.open === 'true' ? 'false' : 'true';
+}
+
+async function tpShowCourseDetail(courseId) {
+  const panel = document.getElementById('tp-matrix');
+  panel.innerHTML = `<div style="padding:14px;color:#475569;font-size:.75rem;">Loading ${esc(courseId)}…</div>`;
+
+  const course = exAllCourses.find(c => c.course_id === courseId) || {};
+
+  try {
+    const resp = await fetch(`${API}/topics/course-info?course=${encodeURIComponent(courseId)}`);
+    const data = await resp.json();
+    tpRenderCourseDetail(courseId, course, data);
+  } catch {
+    panel.innerHTML = `<div style="padding:14px;color:#f87171;font-size:.75rem;">Failed to load.</div>`;
+  }
+}
+
+function tpRenderCourseDetail(courseId, course, data) {
+  const panel = document.getElementById('tp-matrix');
+  const panelHead = document.getElementById('tp-matrix-panel').querySelector('.tp-panel-head');
+  panelHead.textContent = courseId + ' Details';
+
+  const tags = data.tags || [];
+  const topics = data.topics || [];
+
+  // Top tags (count > 1 → shared across topics; shown with frequency)
+  const tagCloud = tags.map(t => {
+    const opacity = Math.min(1, 0.4 + (t.count / (tags[0]?.count || 1)) * 0.6);
+    return `<span class="tp-detail-tag" style="opacity:${opacity.toFixed(2)}" title="${t.count} topic${t.count>1?'s':''}">${esc(t.tag)}<span class="tp-detail-tag-count">${t.count}</span></span>`;
+  }).join('');
+
+  // Category distribution (averaged across all topics)
+  const catAgg = {};
+  topics.forEach(t => {
+    Object.entries(t.categories || {}).forEach(([k, v]) => { catAgg[k] = (catAgg[k] || 0) + v; });
+  });
+  const n = topics.length || 1;
+  const catAvg = Object.fromEntries(Object.entries(catAgg).map(([k, v]) => [k, v / n]));
+
+  let html = `<div class="tp-detail-back" onclick="tpBackToMatrix()">← Back to Matrix</div>`;
+
+  // Course header
+  const badges = [
+    course.course_type ? `<span class="ex-badge ex-badge-type">${esc(course.course_type)}</span>` : '',
+    course.credits     ? `<span class="ex-badge ex-badge-credits">${course.credits} cr</span>`     : '',
+  ].filter(Boolean).join('');
+  html += `<div class="tp-detail-section">
+    <div class="tp-detail-title">${esc(courseId)}: ${esc(course.name || '')}</div>
+    ${badges ? `<div class="ex-badge-row" style="margin:4px 0">${badges}</div>` : ''}
+    ${course.instructors ? `<div class="tp-detail-subtitle">👤 ${esc(course.instructors)}</div>` : ''}
+    ${course.description ? `<div class="tp-detail-desc">${esc(course.description)}</div>` : ''}
+    ${course.prereqs ? `<div class="tp-detail-subtitle" style="margin-top:4px">Prerequisites: ${esc(course.prereqs)}</div>` : ''}
+  </div>`;
+
+  // Category distribution
+  html += `<div class="tp-detail-section">
+    <div class="tp-detail-label">Category Composition</div>
+    ${renderCatBars(catAvg)}
+  </div>`;
+
+  // Tag cloud
+  if (tags.length) {
+    html += `<div class="tp-detail-section">
+      <div class="tp-detail-label">All Tags (${tags.length} unique · number = topics carrying this tag)</div>
+      <div class="tp-detail-tag-cloud">${tagCloud}</div>
+    </div>`;
+  }
+
+  // Topics list
+  html += `<div class="tp-detail-section">
+    <div class="tp-detail-label">${topics.length} Topics — click to see tags</div>`;
+  topics.forEach(t => {
+    const tTagHtml = (t.tags || []).map(tag =>
+      `<span class="tp-tag">${esc(tag)}</span>`
+    ).join('');
+    const descSnip = t.description ? `<div class="tp-detail-topic-desc">${esc(t.description.slice(0,120))}${t.description.length>120?'…':''}</div>` : '';
+    html += `<div class="tp-detail-topic-row">
+      <div class="tp-detail-topic-name" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">${esc(t.topic)}</div>
+      <div style="display:none">
+        ${descSnip}
+        <div class="tp-tags" style="margin-top:3px">${tTagHtml || '<span style="color:#334155;font-size:.6rem">no tags</span>'}</div>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  panel.innerHTML = html;
+}
+
+function tpShowTopicDetail(topicData) {
+  if (typeof topicData === 'string') topicData = JSON.parse(topicData);
+  const panel = document.getElementById('tp-matrix');
+  const panelHead = document.getElementById('tp-matrix-panel').querySelector('.tp-panel-head');
+  panelHead.textContent = 'Topic Detail';
+
+  const tags = topicData.tags || [];
+  const cats = topicData.categories || {};
+  const sharedSet = new Set(topicData.shared_tags || topicData.matched_tags || []);
+
+  const tagHtml = tags.map(t => {
+    const isHighlight = sharedSet.has(t);
+    return `<span class="${isHighlight ? 'tp-tag tp-tag-shared' : 'tp-tag'}">${esc(t)}</span>`;
+  }).join('');
+
+  const catBars = renderCatBars(cats);
+  const course = exAllCourses.find(c => c.course_id === topicData.course_id) || {};
+
+  let html = `<div class="tp-detail-back" onclick="tpBackToMatrix()">← Back to Matrix</div>
+  <div class="tp-detail-section">
+    <div class="tp-detail-subtitle" style="margin-bottom:3px;cursor:pointer;color:#818cf8" onclick="tpShowCourseDetail('${esc(topicData.course_id)}')">${esc(topicData.course_id)} — ${esc(course.name||'')}</div>
+    <div class="tp-detail-title">${esc(topicData.topic_text)}</div>
+    ${topicData.description ? `<div class="tp-detail-desc" style="margin-top:6px">${esc(topicData.description)}</div>` : ''}
+  </div>`;
+
+  if (tags.length) {
+    html += `<div class="tp-detail-section">
+      <div class="tp-detail-label">Tags${sharedSet.size ? ' (orange = shared/matched)' : ''}</div>
+      <div class="tp-tags" style="gap:4px">${tagHtml}</div>
+    </div>`;
+  }
+
+  html += `<div class="tp-detail-section">
+    <div class="tp-detail-label">Category Composition</div>
+    ${catBars}
+  </div>`;
+
+  if (topicData.topic_matches && topicData.topic_matches.length) {
+    const rows = topicData.topic_matches.map(m =>
+      `<div class="tp-similar-item">
+        <span class="tp-similar-score">${(m.sem_score*100).toFixed(0)}%</span>
+        <span class="tp-similar-cid">${esc(m.course_id)}</span>
+        <span class="tp-similar-text">${esc(m.topic_text)}</span>
+      </div>`).join('');
+    html += `<div class="tp-detail-section">
+      <div class="tp-detail-label">Semantically Similar Topics</div>
+      <div class="tp-similar-list">${rows}</div>
+    </div>`;
+  }
+
+  panel.innerHTML = html;
+}
+
+function tpBackToMatrix() {
+  const panelHead = document.getElementById('tp-matrix-panel').querySelector('.tp-panel-head');
+  panelHead.textContent = 'Course Matchings';
+  const lastData = _tpLastSearch;
+  if (lastData) tpRenderMatrix(lastData);
+  else document.getElementById('tp-matrix').innerHTML =
+    '<div class="ex-empty" style="padding-top:60px;"><p style="font-size:.8rem;color:#334155;">Matchings appear after a search</p></div>';
+}
+
+async function tpExplain(btn) {
+  const key = getApiKey();
+  if (!key) {
+    toggleKeyPanel();
+    btn.textContent = '⚙ Set API key first ↑';
+    setTimeout(() => { btn.textContent = '✦ Explain this connection'; }, 3000);
+    return;
+  }
+  const ctx = JSON.parse(btn.dataset.ctx || '{}');
+  const uid = btn.dataset.uid;
+
+  btn.disabled = true;
+  btn.textContent = '✦ Generating…';
+
+  try {
+    const resp = await fetch(`${API}/topics/explain`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Api-Key': key },
+      body: JSON.stringify({
+        source_course: ctx.sc, source_topic: ctx.st,
+        target_course: ctx.tc, target_topic: ctx.tt,
+        shared_tags: ctx.shared, source_tags: ctx.stags,
+        target_tags: ctx.ttags, force: false,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      btn.disabled = false;
+      btn.textContent = `✦ Error: ${data.detail || resp.statusText}`;
+      return;
+    }
+    if (data.explanation) {
+      tpRenderExplanation(uid, ctx, data.explanation, data.signed_by);
+    }
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = '✦ Explain this connection';
+  }
+}
+
+function tpRenderExplanation(uid, ctx, explanation, signedBy) {
+  const container = document.getElementById(uid);
+  if (!container) return;
+  const sc = ctx.sc, st = ctx.st, tc = ctx.tc, tt = ctx.tt;
+
+  /* Context header — shows both topics side by side */
+  function ctxCard(courseId, topicText, desc, tags, cats, sharedSet) {
+    const course = exAllCourses.find(c => c.course_id === courseId);
+    const cname  = course ? course.name : courseId;
+    const topCats = Object.entries(cats || {})
+      .sort((a,b) => b[1]-a[1]).slice(0,3)
+      .filter(([,v]) => v >= 0.05)
+      .map(([k,v]) => `<span style="color:${CAT_COLORS[k]||'#64748b'}">${k} ${(v*100).toFixed(0)}%</span>`)
+      .join(' · ');
+    const tagBadges = (tags || []).map(t => {
+      const cls = (sharedSet||new Set()).has(t) ? 'tp-tag tp-tag-shared' : 'tp-tag';
+      return `<span class="${cls}">${esc(t)}</span>`;
+    }).join('');
+    return `<div class="tp-expl-ctx-card">
+      <div class="tp-expl-ctx-course">${esc(courseId)} — ${esc(cname)}</div>
+      <div class="tp-expl-ctx-topic">${esc(topicText)}</div>
+      ${desc ? `<div class="tp-expl-ctx-desc">${esc(desc.slice(0,180))}${desc.length>180?'…':''}</div>` : ''}
+      ${topCats ? `<div class="tp-expl-ctx-cats">${topCats}</div>` : ''}
+      ${tagBadges ? `<div class="tp-expl-ctx-tags">${tagBadges}</div>` : ''}
+    </div>`;
+  }
+
+  const sharedSet = new Set(ctx.shared || []);
+  const contextHtml = `<div class="tp-expl-context">
+    ${ctxCard(sc, st, ctx.sdesc||'', ctx.stags||[], ctx.scats||{}, sharedSet)}
+    ${ctxCard(tc, tt, ctx.tdesc||'', ctx.ttags||[], ctx.tcats||{}, sharedSet)}
+  </div>`;
+
+  /* Explanation lines */
+  const lines = explanation.split('\n').filter(Boolean).map(line => {
+    const colon = line.indexOf(': ');
+    if (colon > 0 && colon < 30) {
+      const label = line.slice(0, colon);
+      const text  = line.slice(colon + 2);
+      const isSurprise = label.toLowerCase().includes('non-obvious') || label.toLowerCase().includes('surprise');
+      if (isSurprise) {
+        return `<div class="tp-explanation-line" style="background:rgba(167,139,250,0.06);padding:3px 6px;border-radius:3px;border-left:2px solid rgba(167,139,250,0.4);margin-top:2px">
+          <span class="tp-explanation-label" style="color:#a78bfa">◈ ${esc(label)}:</span> <span style="color:#c4b5fd">${esc(text)}</span></div>`;
+      }
+      return `<div class="tp-explanation-line"><span class="tp-explanation-label">${esc(label)}:</span> ${esc(text)}</div>`;
+    }
+    return `<div class="tp-explanation-line">${esc(line)}</div>`;
+  }).join('');
+
+  const signedHtml = signedBy
+    ? `<div class="tp-signed-by">✎ Signed by ${esc(signedBy)}</div>`
+    : `<div class="tp-sign-row">
+        <input class="tp-sign-input" placeholder="Professor name…" id="${uid}-sign-input">
+        <button class="tp-sign-btn" onclick="tpSign('${uid}','${CSS.escape(sc)}','${CSS.escape(st)}','${CSS.escape(tc)}','${CSS.escape(tt)}')">Sign</button>
+       </div>`;
+
+  const ctxJson = JSON.stringify(ctx).replace(/'/g,"&#39;");
+  container.innerHTML = `<div class="tp-explanation-box">
+    ${contextHtml}
+    <div id="${uid}-lines">${lines}</div>
+    ${signedHtml}
+  </div>
+  <div class="ex-expl-actions" style="margin-top:4px">
+    <button class="tp-explain-btn" data-ctx='${ctxJson}' data-uid="${uid}" onclick="tpRegenExplain(this)">↺ Regenerate</button>
+    <button class="ex-expl-action-btn" onclick="tpEditExpl('${uid}','${CSS.escape(sc)}','${CSS.escape(st)}','${CSS.escape(tc)}','${CSS.escape(tt)}')">✎ Edit</button>
+  </div>`;
+}
+
+function tpEditExpl(uid, sc, st, tc, tt) {
+  const linesEl = document.getElementById(`${uid}-lines`);
+  if (!linesEl) return;
+  const rawLines = [...linesEl.querySelectorAll('.tp-explanation-line')].map(el => {
+    const lbl = el.querySelector('.tp-explanation-label');
+    if (lbl) return lbl.textContent.replace(/:$/, '') + ': ' + (el.textContent.replace(lbl.textContent, '').trim());
+    return el.textContent.trim();
+  }).filter(Boolean).join('\n');
+
+  linesEl.outerHTML = `<div id="${uid}-edit-area">
+    <textarea class="ex-expl-edit-area" id="${uid}-ta">${rawLines}</textarea>
+    <div class="ex-expl-actions">
+      <button class="ex-expl-save-btn" onclick="tpSaveExpl('${uid}','${CSS.escape(sc)}','${CSS.escape(st)}','${CSS.escape(tc)}','${CSS.escape(tt)}')">✓ Save</button>
+      <button class="ex-expl-action-btn" onclick="tpCancelEdit('${uid}','${rawLines}')">✕ Cancel</button>
+    </div>
+  </div>`;
+}
+
+function tpCancelEdit(uid, rawLines) {
+  const area = document.getElementById(`${uid}-edit-area`);
+  if (area) area.outerHTML = `<div id="${uid}-lines">${rawLines.split('\n').filter(Boolean).map(line => {
+    const colon = line.indexOf(': ');
+    if (colon > 0 && colon < 30) {
+      const label = line.slice(0, colon);
+      const text  = line.slice(colon + 2);
+      return `<div class="tp-explanation-line"><span class="tp-explanation-label">${esc(label)}:</span> ${esc(text)}</div>`;
+    }
+    return `<div class="tp-explanation-line">${esc(line)}</div>`;
+  }).join('')}</div>`;
+}
+
+async function tpSaveExpl(uid, sc, st, tc, tt) {
+  const ta = document.getElementById(`${uid}-ta`);
+  if (!ta) return;
+  const text = ta.value.trim();
+  if (!text) return;
+  try {
+    const resp = await fetch(`${API}/topics/save-explanation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source_course: sc, source_topic: st, target_course: tc, target_topic: tt, explanation: text }),
+    });
+    if (!resp.ok) { alert('Save failed'); return; }
+    const area = document.getElementById(`${uid}-edit-area`);
+    if (area) area.outerHTML = `<div id="${uid}-lines">${text.split('\n').filter(Boolean).map(line => {
+      const colon = line.indexOf(': ');
+      if (colon > 0 && colon < 30) {
+        const label = line.slice(0, colon);
+        const txt   = line.slice(colon + 2);
+        return `<div class="tp-explanation-line"><span class="tp-explanation-label">${esc(label)}:</span> ${esc(txt)}</div>`;
+      }
+      return `<div class="tp-explanation-line">${esc(line)}</div>`;
+    }).join('')}</div>`;
+  } catch (err) { alert(`Save failed: ${err.message}`); }
+}
+
+async function tpRegenExplain(btn) {
+  const uid = btn.dataset.uid;
+  const ctx = JSON.parse(btn.dataset.ctx || '{}');
+  const key = getApiKey();
+  if (!key) { toggleKeyPanel(); return; }
+  btn.disabled = true; btn.textContent = '↺ Generating…';
+  try {
+    const resp = await fetch(`${API}/topics/explain`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Api-Key': key },
+      body: JSON.stringify({
+        source_course: ctx.sc, source_topic: ctx.st,
+        target_course: ctx.tc, target_topic: ctx.tt,
+        shared_tags: ctx.shared || [], source_tags: ctx.stags || [],
+        target_tags: ctx.ttags || [], force: true,
+      }),
+    });
+    const data = await resp.json();
+    if (data.explanation) tpRenderExplanation(uid, ctx, data.explanation, data.signed_by);
+    else { btn.disabled = false; btn.textContent = '↺ Regenerate'; }
+  } catch { btn.disabled = false; btn.textContent = '↺ Regenerate'; }
+}
+
+async function tpSign(uid, sc, st, tc, tt) {
+  const input = document.getElementById(`${uid}-sign-input`);
+  const name = input ? input.value.trim() : '';
+  if (!name) return;
+  await fetch(`${API}/topics/sign`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_course: sc, source_topic: st,
+                           target_course: tc, target_topic: tt,
+                           signed_by: name }),
+  });
+  const signRow = input.closest('.tp-sign-row');
+  if (signRow) signRow.outerHTML = `<div class="tp-signed-by">✎ Signed by ${esc(name)}</div>`;
 }
 
 function tpCellCls(score) {
@@ -1732,35 +2590,43 @@ function tpRenderMatrix(data) {
 
   // Table header
   let html = `<div class="tp-matrix-wrap">
-    <div class="tp-matrix-title">${courses.length} courses matched — click a cell to view details</div>
+    <div class="tp-matrix-title">${courses.length} courses — click any cell for details · ✦ = no explanation yet · click course ID for course info</div>
     <table class="tp-matrix-table">
       <thead><tr>
         <th></th>
-        ${courses.map(c => `<th>${esc(c)}</th>`).join('')}
+        ${courses.map(c => `<th style="cursor:pointer" onclick="tpShowCourseDetail('${esc(c)}')" title="View ${esc(c)}">${esc(c)}</th>`).join('')}
       </tr></thead>
       <tbody>`;
 
   courses.forEach(ra => {
-    html += `<tr><th class="row-label">${esc(ra)}</th>`;
+    html += `<tr><th class="row-label" style="cursor:pointer" onclick="tpShowCourseDetail('${esc(ra)}')" title="View ${esc(ra)} details">${esc(ra)}</th>`;
     courses.forEach(ca => {
       if (ra === ca) {
         html += `<td class="tp-cell-self">—</td>`;
       } else {
-        const sim = lookup[`${ra}|${ca}`];
+        const sim   = lookup[`${ra}|${ca}`];
         const score = sim ? (sim.final_score || 0) : null;
         const cls   = tpCellCls(score);
-        const label = score != null ? `${(score * 100).toFixed(0)}%` : 'n/a';
-        const nonOb = sim?.non_obvious_score != null
-          ? `<br><span style="font-size:.6rem;color:#f97316">${(sim.non_obvious_score*100).toFixed(0)}% ◈</span>`
-          : '';
-        const connData = sim
-          ? `data-a="${esc(ra)}" data-b="${esc(ca)}"
-             data-score="${score}" data-lex="${sim.lex_score||0}"
-             data-sem="${sim.sem_score||0}" data-nonob="${sim.non_obvious_score||''}"
-             data-catjsd="${sim.category_jsd||''}"
-             data-terms='${JSON.stringify(sim.driving_terms||[]).replace(/'/g,"&#39;")}'
-             data-expl="${esc(sim.llm_explanation||'')}"` : '';
-        html += `<td class="${cls} tp-matrix-cell" ${connData} onclick="tpCellClick(this)">${label}${nonOb}</td>`;
+        const hasExpl = !!(sim?.llm_explanation);
+        // Score label + non-obvious indicator
+        let label;
+        if (score != null) {
+          const nonObSpan = sim?.non_obvious_score != null
+            ? `<br><span style="font-size:.55rem;color:#f97316">${(sim.non_obvious_score*100).toFixed(0)}% ◈</span>` : '';
+          const explDot = hasExpl
+            ? '' : `<span style="font-size:.55rem;color:#334155;margin-left:2px">✦</span>`;
+          label = `${(score * 100).toFixed(0)}%${explDot}${nonObSpan}`;
+        } else {
+          label = `<span style="font-size:.6rem">?</span>`;
+        }
+        // Always put data-a / data-b so every cell is clickable
+        const connData = `data-a="${esc(ra)}" data-b="${esc(ca)}"
+          data-score="${score ?? ''}" data-lex="${sim?.lex_score||''}"
+          data-sem="${sim?.sem_score||''}" data-nonob="${sim?.non_obvious_score||''}"
+          data-catjsd="${sim?.category_jsd||''}"
+          data-terms='${JSON.stringify(sim?.driving_terms||[]).replace(/'/g,"&#39;")}'
+          data-expl="${esc(sim?.llm_explanation||'')}"`;
+        html += `<td class="${cls} tp-matrix-cell" ${connData} onclick="tpCellClick(this)" title="${ra} ↔ ${ca}">${label}</td>`;
       }
     });
     html += `</tr>`;
@@ -1770,17 +2636,42 @@ function tpRenderMatrix(data) {
   matEl.innerHTML = html;
 }
 
-function tpCellClick(td) {
-  const a   = td.dataset.a;
-  const b   = td.dataset.b;
+async function tpCellClick(td) {
+  const a = td.dataset.a;
+  const b = td.dataset.b;
   if (!a || !b) return;
+
+  // If no score data yet, fetch from DB first
+  if (td.dataset.score === '') {
+    td.style.opacity = '0.5';
+    try {
+      const resp = await fetch(`${API}/similarity?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`);
+      if (resp.ok) {
+        const sim = await resp.json();
+        // Patch cell with fetched data
+        td.dataset.score  = sim.final_score  || '';
+        td.dataset.lex    = sim.lex_score    || '';
+        td.dataset.sem    = sim.sem_score    || '';
+        td.dataset.nonob  = sim.non_obvious_score || '';
+        td.dataset.catjsd = sim.category_jsd || '';
+        td.dataset.terms  = JSON.stringify(sim.driving_terms || []);
+        td.dataset.expl   = sim.llm_explanation || '';
+        const s = sim.final_score;
+        td.className = `${tpCellCls(s)} tp-matrix-cell`;
+        td.innerHTML  = s != null ? `${(s*100).toFixed(0)}%` : '?';
+      }
+    } catch {}
+    td.style.opacity = '';
+  }
+
+  const score = td.dataset.score !== '' ? parseFloat(td.dataset.score) : null;
   const d = {
     courseId:        b,
     name:            b,
-    finalScore:      parseFloat(td.dataset.score) || 0,
+    finalScore:      score ?? 0,
     lexScore:        parseFloat(td.dataset.lex)   || 0,
     semScore:        parseFloat(td.dataset.sem)   || 0,
-    nonObviousScore: td.dataset.nonob ? parseFloat(td.dataset.nonob) : null,
+    nonObviousScore: td.dataset.nonob  ? parseFloat(td.dataset.nonob)  : null,
     categoryJsd:     td.dataset.catjsd ? parseFloat(td.dataset.catjsd) : null,
     llmExplanation:  td.dataset.expl || '',
     drivingTerms:    JSON.parse(td.dataset.terms || '[]'),

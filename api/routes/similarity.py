@@ -1,10 +1,17 @@
 from fastapi import APIRouter, Header, HTTPException, Query
 from typing import Optional
+from pydantic import BaseModel
 import storage.postgres_store as pg_store
 from scoring.category_scorer import course_category_vector, CATEGORIES
 from pipeline.llm_explainer import explain_connection
 
 router = APIRouter()
+
+
+class SaveExplanationRequest(BaseModel):
+    a: str
+    b: str
+    explanation: str
 
 
 @router.get("/categories")
@@ -91,10 +98,21 @@ def get_non_obvious(
     return {"pairs": pairs, "count": len(pairs)}
 
 
+@router.post("/explanation")
+def save_explanation(body: SaveExplanationRequest):
+    """Save a manually-edited explanation for a course pair."""
+    result = pg_store.get_similarity(body.a, body.b)
+    if result is None:
+        raise HTTPException(404, detail=f"No similarity record for '{body.a}' ↔ '{body.b}'")
+    pg_store.update_llm_explanation(body.a, body.b, body.explanation)
+    return {"ok": True}
+
+
 @router.get("/explain")
 def get_explanation(
     a: str = Query(..., description="First course ID"),
     b: str = Query(..., description="Second course ID"),
+    force: bool = Query(False, description="Force regeneration even if cached"),
     x_api_key: Optional[str] = Header(None, description="Gemini API key for on-demand generation"),
 ):
     """
@@ -108,7 +126,7 @@ def get_explanation(
     if result is None:
         raise HTTPException(404, detail=f"No similarity record for '{a}' ↔ '{b}'")
 
-    if not result.get("llm_explanation"):
+    if not result.get("llm_explanation") or force:
         if not x_api_key:
             # No cached explanation and no key — let the UI show the Generate button
             return {
@@ -123,27 +141,43 @@ def get_explanation(
 
         ca = result["course_a"]
         cb = result["course_b"]
-        topics_a = pg_store.get_topic_texts_for_course(ca, limit=5)
-        topics_b = pg_store.get_topic_texts_for_course(cb, limit=5)
+        ctx_a = pg_store.get_course_explain_context(ca)
+        ctx_b = pg_store.get_course_explain_context(cb)
+
+        # Enrich topic list with descriptions from topic_definitions.json
+        import json as _json
+        from pathlib import Path
+        import config as _cfg
+        defs: dict = {}
+        defs_path = Path(_cfg.DEFINITIONS_PATH)
+        if defs_path.exists():
+            with open(defs_path) as f:
+                defs = _json.load(f)
+        descs_a = {t: defs.get(f"{ca}: {t}", "") for t in ctx_a["topics"]}
+        descs_b = {t: defs.get(f"{cb}: {t}", "") for t in ctx_b["topics"]}
+
         try:
             from google import genai
             llm = genai.Client(api_key=x_api_key)
             llm_result = explain_connection(
-                course_a=ca, topics_a=topics_a,
-                course_b=cb, topics_b=topics_b,
+                course_a=ca, topics_a=ctx_a["topics"],
+                course_b=cb, topics_b=ctx_b["topics"],
                 sem_score=result["sem_score"] or 0.0,
                 cat_jsd=result["category_jsd"] or 0.0,
+                non_obvious_score=result["non_obvious_score"] or 0.0,
+                name_a=ctx_a["name"], name_b=ctx_b["name"],
+                cats_a=ctx_a["categories"], cats_b=ctx_b["categories"],
+                topic_descs_a=descs_a, topic_descs_b=descs_b,
                 client=llm,
             )
         except Exception as e:
             raise HTTPException(502, detail=str(e))
         parts = []
-        for key, label in [("shared_math", "Shared math"),
-                            ("why_surprising", "Why surprising"),
-                            ("analogy", "Analogy")]:
-            val = llm_result.get(key) or llm_result.get("explanation", "")
-            if isinstance(val, dict):
-                val = " ".join(str(v) for v in val.values())
+        for key, label in [("connection",  "Connection"),
+                            ("in_a",        "In " + ca),
+                            ("in_b",        "In " + cb),
+                            ("surprise",    "Why non-obvious")]:
+            val = (llm_result.get(key) or "").strip()
             if val:
                 parts.append(f"{label}: {val}")
         explanation = "\n".join(parts)
