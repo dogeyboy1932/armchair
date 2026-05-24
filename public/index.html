@@ -981,11 +981,9 @@
 <div id="tooltip"></div>
 
 <script>
-// Use an empty string for relative paths when served by the backend, 
-  // or a fallback to a production API URL when hosted statically on Netlify.
-  const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://localhost:8080' 
-    : 'https://siip-api.onrender.com'; // TODO: Update with your production backend URL
+const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8080'
+    : window.location.origin;
 
 /* ═══════════════════════════════════════════════════════
    API KEY MANAGEMENT
