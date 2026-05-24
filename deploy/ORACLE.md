@@ -59,7 +59,9 @@ After setup, your link looks like: **`http://YOUR_ORACLE_IP:8080`**
 | **Memory (GB)** | **12** (minimum; 24 is fine) |
 | **Boot volume** | 50 GB (default is fine) |
 
-4. **Networking** — leave defaults (creates a VCN + public IP automatically)
+4. **Networking** — click **Edit** and set:
+   - **Public IPv4 address:** **Yes** ← required (without this you cannot SSH from your laptop or share a link)
+   - Leave other defaults (creates a VCN + subnet automatically)
 5. **SSH keys** — choose one:
    - **Generate a key pair for me** → download the private key (`ssh-key-*.key`) and save it somewhere safe
    - Or paste your existing public key
@@ -199,10 +201,57 @@ $COMPOSE up -d
 
 ## Part 6 — Troubleshooting
 
-### "Out of host capacity" when creating the VM
+### "Out of host capacity" for VM.Standard.A1.Flex (most common)
 
-Try a different region or retry later. ARM Always Free capacity is limited per region.
+Oracle's free ARM VMs are popular — **AD-1 is often full**. Fix in this order:
 
+#### Fix 1 — Change availability domain (try first)
+
+On the **Create instance** page, under **Placement**:
+
+| Setting | Change to |
+|---------|-----------|
+| **Availability domain** | **AD-2** (if that fails, try **AD-3**) |
+| **Fault domain** | **Let Oracle choose** (leave as-is) |
+
+Click **Create** again. Stay on shape `VM.Standard.A1.Flex`.
+
+#### Fix 2 — Use minimum shape to squeeze in
+
+| Setting | Value |
+|---------|-------|
+| **OCPUs** | **1** |
+| **Memory** | **6 GB** |
+
+The install script adds 4 GB swap — 6 GB RAM works, just slower on first boot.
+
+#### Fix 3 — Retry at off-peak hours
+
+Capacity frees up randomly. Retry early morning US time (5–8 AM ET).
+
+#### Fix 4 — Different home region (last resort)
+
+Always Free ARM capacity is per region. If your home region stays full (`us-ashburn-1` and `us-phoenix-1` are worst), you'd need a **new Oracle account** with a different home region (`uk-london-1`, `eu-frankfurt-1`, `ap-osaka-1`). You cannot change home region on an existing account.
+
+#### If ARM never works — free fallback (no VM)
+
+Run locally and expose via Cloudflare Tunnel ($0):
+
+```bash
+cloudflared tunnel --url http://localhost:8080
+```
+
+Share the `https://....trycloudflare.com` link. Your laptop must stay on.
+
+---
+
+### Wrong networking: Public IPv4 = No
+
+If the review page shows **Public IPv4 address: No**, you cannot SSH from home or share a public link.
+
+**Fix:** Edit **Networking** → **Assign a public IPv4 address** → **Yes** → Create again.
+
+---
 ### Install script fails on Docker
 
 ```bash
