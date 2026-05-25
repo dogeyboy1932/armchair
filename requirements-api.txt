@@ -22,6 +22,7 @@ aiofiles>=23.0
 # Utils
 numpy<2.0,>=1.24
 scipy>=1.11
+networkx>=3.2
 nltk>=3.8
 tqdm>=4.66
 python-dotenv>=1.0

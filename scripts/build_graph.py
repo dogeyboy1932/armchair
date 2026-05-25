@@ -27,14 +27,12 @@ def main():
 
     edge_count = score_all_pairs(lms, all_counts)
 
-    print("\nRunning Neo4j GDS algorithms …")
+    print("\nRunning community detection (GDS or NetworkX fallback) …")
     try:
         neo4j.run_community_detection()
-        print("  Louvain community detection: done")
-        print("  PageRank: done")
+        print("  Louvain + PageRank: done")
     except Exception as e:
-        print(f"  GDS skipped: {e}")
-        print("  (Retry once Neo4j has fully booted and GDS plugin is loaded)")
+        print(f"  Community detection failed: {e}")
 
     print(f"\nGraph build complete — {edge_count} edges in Neo4j.")
     print("Start the API: uvicorn api.main:app --port 8080 --reload")

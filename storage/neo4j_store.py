@@ -54,6 +54,20 @@ def upsert_edge(course_a: str, course_b: str, score: float,
 
 
 def run_community_detection():
+    """
+    Assign Louvain communities + PageRank to every Course node.
+
+    Prefers Neo4j GDS (available in local Docker). Neo4j Aura Free has no GDS
+    plugin, so we fall back to NetworkX with identical write-back semantics.
+    """
+    try:
+        _run_community_detection_gds()
+    except Exception as e:
+        print(f"  GDS unavailable ({e}); using NetworkX fallback …")
+        _run_community_detection_networkx()
+
+
+def _run_community_detection_gds():
     with _get_driver().session() as s:
         # Drop stale projection if it exists
         try:
@@ -87,6 +101,64 @@ def run_community_detection():
             })
         """)
         s.run("CALL gds.graph.drop('courseGraph')")
+
+
+def _fetch_weighted_graph() -> tuple[list[str], list[tuple[str, str, float]]]:
+    """Return (node_ids, undirected edges as (a, b, score))."""
+    with _get_driver().session() as s:
+        nodes = [r['id'] for r in s.run("MATCH (c:Course) RETURN c.id AS id")]
+        edges = [
+            (r['a'], r['b'], float(r['score'] or 0.01))
+            for r in s.run("""
+                MATCH (a:Course)-[r:SIMILAR_TO]-(b:Course)
+                WHERE a.id < b.id
+                RETURN a.id AS a, b.id AS b, r.score AS score
+            """)
+        ]
+    return nodes, edges
+
+
+def _run_community_detection_networkx():
+    import networkx as nx
+    from networkx.algorithms import community as nx_comm
+
+    node_ids, edges = _fetch_weighted_graph()
+    if not node_ids:
+        return
+
+    G = nx.Graph()
+    G.add_nodes_from(node_ids)
+    for a, b, score in edges:
+        weight = max(score, 0.01)
+        if G.has_edge(a, b):
+            G[a][b]['weight'] = max(G[a][b]['weight'], weight)
+        else:
+            G.add_edge(a, b, weight=weight)
+
+    communities = nx_comm.louvain_communities(G, weight='weight', seed=42)
+    comm_map: dict[str, int] = {}
+    for cid, members in enumerate(sorted(communities, key=lambda s: min(s))):
+        for node in members:
+            comm_map[node] = cid
+
+    pr = nx.pagerank(G, weight='weight') if edges else {n: 1.0 / len(node_ids) for n in node_ids}
+
+    rows = [
+        {
+            'id':        nid,
+            'community': comm_map.get(nid, 0),
+            'pagerank':  float(pr.get(nid, 0.0)),
+        }
+        for nid in node_ids
+    ]
+
+    with _get_driver().session() as s:
+        s.run("""
+            UNWIND $rows AS row
+            MATCH (c:Course {id: row.id})
+            SET c.community = row.community,
+                c.pagerank  = row.pagerank
+        """, rows=rows)
 
 
 def get_shortest_path(from_id: str, to_id: str) -> list:
@@ -145,8 +217,8 @@ def get_full_graph(min_score: float = 0.4) -> dict:
         nodes_result = s.run("""
             MATCH (c:Course)
             RETURN c.id AS id, c.name AS name,
-                   coalesce(c.community, 0)  AS community,
-                   coalesce(c.pagerank, 0.0) AS pagerank
+                   c.community AS community,
+                   c.pagerank  AS pagerank
         """)
         nodes = [dict(r) for r in nodes_result]
 
