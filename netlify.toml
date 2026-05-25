@@ -1,9 +1,0 @@
-[build]
-  publish = "public"
-
-# SPA routing fallback: static files (upload.html, config.js, …) are served
-# directly when they exist; unknown paths fall back to index.html.
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200

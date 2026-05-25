@@ -1,25 +1,24 @@
-# SIIP production deploy: Supabase + Neo4j Aura + Fly.io + Netlify
+# SIIP production deploy: Supabase + Neo4j Aura + Fly.io
 
 Production is a **true clone of local** — same features, same maintenance ops, same
-scripts. The only difference is where the boxes run. No more "compute locally and
+scripts. The only difference is where the boxes run. No "compute locally and
 push": everything (SciNCL embedding, PDF ingest, topic graph builds, category
 labeling) happens on Fly.
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│  Browser ── Netlify (static frontend) ── Fly (FastAPI + SciNCL)  │
-│                                              │                   │
-│                                              ├─→ Supabase (pgvec)│
-│                                              └─→ Neo4j Aura      │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  Browser ──► Fly (FastAPI + UI + SciNCL)                 │
+│                       │                                  │
+│                       ├──► Supabase (Postgres + pgvector)│
+│                       └──► Neo4j Aura                    │
+└──────────────────────────────────────────────────────────┘
 ```
 
 | Service | Plan | Used for |
 |---|---|---|
-| Fly.io | Hobby ($5/mo credit) | API + SciNCL + scripts (1 always-on 2GB VM) |
+| Fly.io | Hobby ($5/mo credit) | UI + API + SciNCL + scripts (1 always-on 2GB VM) |
 | Supabase | Free | Postgres 17 + pgvector |
 | Neo4j Aura | Free | Course similarity graph |
-| Netlify | Starter (free) | Frontend (`public/`) |
 | Gemini | Free tier | Topic extraction, category labels, explanations |
 
 Net cost: **~$0/month** (Fly's 2 GB machine is ~$3.89/mo, covered by the $5 hobby credit).
@@ -28,18 +27,21 @@ Net cost: **~$0/month** (Fly's 2 GB machine is ~$3.89/mo, covered by the $5 hobb
 
 ## Architecture notes
 
-- **One Docker image**, baked with SciNCL (420 MB) + CPU PyTorch + pdfplumber + all
-  scripts. Cold-starts skip the model download.
+- **One service**: Fly serves both the static UI (`public/`) and the FastAPI
+  endpoints from the same origin, so there's no CORS, no CDN, no `config.js`
+  rewriting. Just one URL.
+- **One Docker image**, baked with SciNCL (420 MB) + CPU PyTorch + pdfplumber +
+  all scripts. Cold starts skip the model download.
 - **One always-on Fly machine** (`min_machines_running = 1`) so background
   ingest tasks always have a host.
-- **`scripts/` is included in the image**, so any local pipeline operation works
+- **`scripts/` is included in the image**, so any local pipeline operation runs
   on Fly with `flyctl ssh console -C "python scripts/<name>.py"`.
 - **No local Postgres / Neo4j / Milvus needed** to operate production. Only
-  needed if you actively want to run a second copy locally for development.
+  needed if you actively want a second copy locally for development.
 
 ---
 
-## First-time setup (~15 min of signups)
+## First-time setup (~10 min of signups)
 
 ### 1. Supabase
 1. https://supabase.com → New project → save the DB password.
@@ -59,17 +61,14 @@ Net cost: **~$0/month** (Fly's 2 GB machine is ~$3.89/mo, covered by the $5 hobb
    prevention, not charged inside the $5/mo hobby credit).
 2. `bash deploy/free/00-install-flyctl.sh` then `flyctl auth login` (browser flow).
 
-### 4. Netlify
-1. https://app.netlify.com → signup.
-2. `netlify login` (browser flow). Or set a token in `credentials.env`.
-
-### 5. Gemini API key (optional but recommended)
+### 4. Gemini API key (optional but recommended)
 1. https://aistudio.google.com/apikey → create key.
-2. Paste as `GEMINI_API_KEY` in `credentials.env`.
-3. Without it: PDF ingest, topic labeling, on-demand explanations all return
-   503. Pure similarity (hybrid + neighbors + graph view) still works.
+2. Paste as `GEMINI_API_KEY` in `credentials.env`, **or** paste it in the UI's
+   Settings dialog at runtime — both work. With neither, PDF ingest, topic
+   labeling, and on-demand explanations return 503. Pure similarity
+   (hybrid + neighbors + graph view) still works.
 
-### 6. Fill `credentials.env`
+### 5. Fill `credentials.env`
 ```bash
 cp deploy/free/credentials.env.example deploy/free/credentials.env
 $EDITOR deploy/free/credentials.env
@@ -87,21 +86,20 @@ bash deploy/free/deploy.sh
 ```
 
 **B. From GitHub (continuous, hands-off):**
-Push to `main`. The workflows in `.github/workflows/` build & deploy automatically.
-See `deploy/free/GITHUB_ACTIONS.md` for the one-time secret setup.
+Push to `main`. The workflow in `.github/workflows/deploy-fly.yml` rebuilds &
+deploys automatically. See `deploy/free/GITHUB_ACTIONS.md` for the one-time
+secret setup.
 
-The laptop path runs four steps:
+The laptop path runs three steps:
 
 | Step | What | Where it runs | Time |
 |---|---|---|---|
 | `01-verify-services.sh` | Test Supabase + Aura, install `vector` extension | Locally (one psycopg2 call) | 5 s |
-| `02-deploy-fly.sh` | Build full image (SciNCL, torch, pdfplumber), push, deploy, set secrets | Fly build + Fly machine | 8–12 min |
+| `02-deploy-fly.sh` | Build full image (SciNCL, torch, pdfplumber, UI), push, deploy, set secrets | Fly build + Fly machine | 8–12 min |
 | `04-bootstrap-data.sh` | Seed 33 courses, build similarity graph, label categories, build topic graph | **All on Fly** via `fly ssh` | 5–10 min |
-| `03-deploy-netlify.sh` | Upload `public/` with `config.js` → Fly URL | Netlify CDN | 30 s |
 
 After it finishes, the app lives at:
-- Frontend: `https://<NETLIFY_SITE_NAME>.netlify.app`
-- Backend:  `https://<FLY_APP_NAME>.fly.dev`
+- `https://<FLY_APP_NAME>.fly.dev`  ← UI + API on the same origin
 
 ---
 
@@ -151,10 +149,9 @@ update) in the background. Poll `/ingest/status/<course_id>` from the UI.
 
 ### Redeploying after code changes
 ```bash
-bash deploy/free/02-deploy-fly.sh        # backend
-bash deploy/free/03-deploy-netlify.sh    # frontend
+bash deploy/free/02-deploy-fly.sh
 ```
-Both idempotent; only the changed layers are rebuilt/pushed.
+Idempotent; only the changed layers are rebuilt/pushed.
 
 ---
 
@@ -162,14 +159,13 @@ Both idempotent; only the changed layers are rebuilt/pushed.
 
 | What | Where |
 |---|---|
+| UI (`public/index.html`, `public/upload.html`) | Served by FastAPI on Fly |
 | API process | Fly machine (Chicago `ord`) |
 | SciNCL model weights | Baked into Docker image at `/app/.model_cache` |
 | Pipeline + scripts | `/app/scripts/`, `/app/pipeline/` inside Fly machine |
 | `courses`, `chunks`, `term_counts`, `similarity_cache`, `topic_*` | Supabase Postgres |
 | `chunk_embeddings` (pgvector) | Supabase Postgres |
 | `Course` nodes + `SIMILAR_TO` edges | Neo4j Aura |
-| Static HTML/CSS/JS | Netlify CDN |
-| `window.__SIIP_API__` (where frontend calls) | `config.js` injected at Netlify deploy |
 
 ---
 
@@ -180,7 +176,6 @@ Both idempotent; only the changed layers are rebuilt/pushed.
 | Fly | $5 hobby credit | 1 × 2GB always-on (~$3.89) | $0 |
 | Supabase | 500 MB DB | ~30 MB | $0 |
 | Neo4j Aura | 200K nodes | 35 nodes | $0 |
-| Netlify | 100 GB egress | < 1 GB | $0 |
 | Gemini | Free tier rate limit | A few hundred calls/mo | $0 |
 
 **Total: $0/month** under realistic research workload.

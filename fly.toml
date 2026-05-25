@@ -1,5 +1,5 @@
-# Fly.io deploy config for the SIIP backend.
-# Frontend is served from Netlify (see deploy/free/03-deploy-netlify.sh).
+# Fly.io deploy config for SIIP.
+# Fly hosts the API *and* the static UI from `public/` on the same origin.
 # Databases live in Supabase (pgvector) + Neo4j Aura, set as secrets:
 #   fly secrets set DATABASE_URL=... NEO4J_URI=... NEO4J_USER=... NEO4J_PASSWORD=...
 

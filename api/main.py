@@ -44,22 +44,20 @@ app.include_router(topics.router,     prefix="/topics",     tags=["topics"])
 app.include_router(graph.router,      prefix="/graph",      tags=["graph"])
 app.include_router(ingest.router,     prefix="/ingest",     tags=["ingest"])
 
-app.mount("/static", StaticFiles(directory=str(PUBLIC_DIR)), name="static")
-
 
 @app.get("/health", tags=["meta"])
 def health():
     return {"status": "ok"}
 
 
+app.mount("/static", StaticFiles(directory=str(PUBLIC_DIR)), name="static")
+
+
 @app.get("/", include_in_schema=False)
 def ui():
-    return FileResponse(
-        PUBLIC_DIR / "index.html",
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"},
-    )
+    return FileResponse(PUBLIC_DIR / "index.html", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/upload", include_in_schema=False)
 def upload_page():
-    return FileResponse(PUBLIC_DIR / "upload.html")
+    return FileResponse(PUBLIC_DIR / "upload.html", headers={"Cache-Control": "no-store"})

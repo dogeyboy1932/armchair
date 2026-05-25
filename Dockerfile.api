@@ -35,14 +35,15 @@ ENV NLTK_DATA=/usr/share/nltk_data
 RUN python -c "import nltk; nltk.download('stopwords', download_dir='/usr/share/nltk_data', quiet=True)"
 
 # App code. scripts/ is included so maintenance ops are runnable via `fly ssh`.
+# public/ is served by FastAPI so Fly hosts both the UI and the API.
 COPY api/        ./api/
 COPY scoring/    ./scoring/
 COPY storage/    ./storage/
 COPY pipeline/   ./pipeline/
-COPY public/     ./public/
 COPY scripts/    ./scripts/
 COPY config.py   ./
 COPY data/       ./data/
+COPY public/     ./public/
 
 ENV VECTOR_BACKEND=pgvector
 ENV POSTGRES_SSLMODE=require
