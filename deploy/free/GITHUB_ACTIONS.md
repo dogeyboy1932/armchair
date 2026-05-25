@@ -17,18 +17,30 @@ Live URL: **https://siip-armchair-akhil.fly.dev**
 
 ---
 
-## One-time setup (~1 min)
+## One-time setup (~2 min)
 
-Add **one** secret at
-<https://github.com/dogeyboy1932/armchair/settings/secrets/actions>:
+**If Actions shows "All jobs have failed"**, the usual cause is a missing
+`FLY_API_TOKEN` secret. The deploy step fails before the Docker build starts.
 
-### `FLY_API_TOKEN`
+### Option A — automated (recommended)
 
 ```bash
-flyctl tokens create deploy --app siip-armchair-akhil --name "github-actions-deploy" --expiry 8760h
+flyctl auth login          # if not already
+gh auth login              # GitHub CLI: https://cli.github.com/
+bash deploy/free/setup-github-actions.sh
 ```
 
-Paste the `FlyV1 fm2_...` value as the secret.
+This creates a Fly deploy token and stores it in GitHub Actions secrets.
+
+### Option B — manual
+
+1. ```bash
+   flyctl tokens create deploy --app siip-armchair-akhil --name github-actions --expiry 8760h
+   ```
+2. Copy the `FlyV1 fm2_...` line.
+3. GitHub → [Settings → Secrets → Actions](https://github.com/dogeyboy1932/armchair/settings/secrets/actions)
+   - Name: `FLY_API_TOKEN`
+   - Value: paste the token
 
 ---
 
@@ -36,7 +48,7 @@ Paste the `FlyV1 fm2_...` value as the secret.
 
 | You do | What happens |
 |---|---|
-| Edit code/CSS locally, `git push origin main` | GitHub Actions deploys to Fly (~3 min) |
+| Edit code/CSS locally, `git push origin main` | GitHub Actions deploys to Fly (~5–15 min first build, ~3 min after) |
 | Run `uvicorn` after `link-local-env.sh` | Same Supabase + Aura as production |
 | Upload a PDF on the live site | Fly ingests into shared cloud DBs; local sees it on refresh |
 | Run a maintenance script | Prefer Fly: `flyctl ssh console --app siip-armchair-akhil -C "sh -c 'cd /app && python scripts/…'"` |
@@ -45,8 +57,17 @@ Paste the `FlyV1 fm2_...` value as the secret.
 
 ## Verify the pipeline
 
+After the secret is set:
+
 ```bash
 git commit --allow-empty -m "ci: trigger deploy" && git push origin main
 ```
 
-Watch <https://github.com/dogeyboy1932/armchair/actions>.
+Watch <https://github.com/dogeyboy1932/armchair/actions>. A green run means
+`https://siip-armchair-akhil.fly.dev` is serving the latest `main` commit.
+
+Manual deploy (bypasses GitHub, same result):
+
+```bash
+bash deploy/free/02-deploy-fly.sh
+```

@@ -1,9 +1,6 @@
 name: Deploy to Fly.io
 
 # Every push to main redeploys production (API + UI + SciNCL image).
-# Code/style changes go live automatically. Cloud databases (Supabase, Aura)
-# are unchanged — data only shifts when you upload on the live site or run
-# maintenance scripts against the shared cloud DBs.
 on:
   push:
     branches: [main]
@@ -17,28 +14,43 @@ jobs:
   deploy:
     name: flyctl deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP: siip-armchair-akhil
     steps:
       - uses: actions/checkout@v4
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
+      - name: Verify Fly API token
+        run: |
+          if [ -z "${FLY_API_TOKEN}" ]; then
+            echo "::error::GitHub secret FLY_API_TOKEN is not set."
+            echo "Fix (one time):"
+            echo "  flyctl tokens create deploy --app siip-armchair-akhil --name github-actions --expiry 8760h"
+            echo "  gh secret set FLY_API_TOKEN --repo dogeyboy1932/armchair"
+            echo "See deploy/free/GITHUB_ACTIONS.md"
+            exit 1
+          fi
+          flyctl apps show "$FLY_APP" >/dev/null
+          echo "✓ Fly token valid for app $FLY_APP"
+
       - name: Deploy to Fly
-        run: flyctl deploy --remote-only --wait-timeout 600
+        run: flyctl deploy --app "$FLY_APP" --remote-only --wait-timeout 900
 
       - name: Smoke-test /health
         run: |
           set -e
-          APP_URL="https://siip-armchair-akhil.fly.dev"
-          for i in {1..18}; do
+          APP_URL="https://${FLY_APP}.fly.dev"
+          for i in $(seq 1 24); do
             if curl -sf "$APP_URL/health" >/dev/null; then
               echo "✓ Production healthy at $APP_URL"
               exit 0
             fi
-            echo "Waiting for health… ($i/18)"
+            echo "Waiting for health… ($i/24)"
             sleep 10
           done
-          echo "✗ /health never returned 200" >&2
+          echo "::error::/health never returned 200 at $APP_URL" >&2
+          flyctl logs --app "$FLY_APP" --no-tail 2>&1 | tail -40 || true
           exit 1
