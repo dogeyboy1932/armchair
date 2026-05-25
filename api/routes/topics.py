@@ -1,5 +1,8 @@
 import json
+import time
+from collections import OrderedDict
 from pathlib import Path
+from threading import Lock
 from typing import Optional
 from fastapi import APIRouter, Query, Header, HTTPException
 from pydantic import BaseModel
@@ -15,6 +18,43 @@ if _defs_path.exists():
         _DEFS = json.load(_f)
 
 router = APIRouter()
+
+
+# ── Tiny LRU for /topics/search responses ───────────────────────────────────
+# Same query within _SEARCH_TTL seconds returns the cached payload instantly
+# instead of re-running the full Postgres pipeline. Cleared on PDF ingest
+# (see invalidate_search_cache below).
+_SEARCH_CACHE: "OrderedDict[tuple[str, int], tuple[float, dict]]" = OrderedDict()
+_SEARCH_LOCK  = Lock()
+_SEARCH_MAX   = 128
+_SEARCH_TTL   = 300.0  # seconds
+
+
+def _cache_get(key: tuple[str, int]) -> Optional[dict]:
+    with _SEARCH_LOCK:
+        hit = _SEARCH_CACHE.get(key)
+        if not hit:
+            return None
+        ts, payload = hit
+        if time.time() - ts > _SEARCH_TTL:
+            _SEARCH_CACHE.pop(key, None)
+            return None
+        _SEARCH_CACHE.move_to_end(key)
+        return payload
+
+
+def _cache_put(key: tuple[str, int], payload: dict) -> None:
+    with _SEARCH_LOCK:
+        _SEARCH_CACHE[key] = (time.time(), payload)
+        _SEARCH_CACHE.move_to_end(key)
+        while len(_SEARCH_CACHE) > _SEARCH_MAX:
+            _SEARCH_CACHE.popitem(last=False)
+
+
+def invalidate_search_cache() -> None:
+    """Call after any write to topic_categories / topic_similarity."""
+    with _SEARCH_LOCK:
+        _SEARCH_CACHE.clear()
 
 
 class ExplainRequest(BaseModel):
@@ -82,20 +122,25 @@ def search_topics(
     Example: searching "RLC circuit" matches ECE210's RLC Circuit topic (phase 1),
     then surfaces ME340's Spring-Mass-Damper (phase 2) because both share tags like
     "second-order-ode" and "natural-frequency".
+
+    Performance: every cross-row lookup (per-topic neighbors, per-pair course
+    similarity) is batched into a single Postgres round trip. Identical queries
+    are served from a 5-minute in-process LRU cache.
     """
+    cache_key = (q.strip().lower(), top)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     def _add_description(item: dict) -> dict:
         key = f"{item['course_id']}: {item['topic_text']}"
         item['description'] = _DEFS.get(key, "")
         return item
 
-    # Phase 1: direct text + tag match
+    # Phase 1: direct text + tag match (one query)
     matches = pg_store.search_topics(q, top)
-
     for m in matches:
         _add_description(m)
-        m['topic_matches'] = pg_store.get_similar_topics(
-            m['course_id'], m['topic_text'], limit=6
-        )
 
     # Collect all tags from direct matches for phase 2
     all_tags: list[str] = []
@@ -106,15 +151,24 @@ def search_topics(
                 seen_tags.add(tag)
                 all_tags.append(tag)
 
-    # Phase 2: other courses sharing tags with phase-1 hits
+    # Phase 2: other courses sharing tags with phase-1 hits (one query)
     direct_courses = list(dict.fromkeys(m['course_id'] for m in matches))
     related = pg_store.find_related_by_tags(all_tags, exclude_courses=direct_courses)
-
     for r in related:
         _add_description(r)
-        r['topic_matches'] = pg_store.get_similar_topics(
-            r['course_id'], r['topic_text'], limit=4
+        # The UI doesn't render `topic_matches` for related items, so we
+        # don't fetch them. (Saved ~50 round trips per search.)
+        r['explanation'] = None
+        r['signed_by']   = None
+
+    # Batched neighbor lookup for direct matches only (one query for all of them).
+    if matches:
+        neighbor_map = pg_store.get_similar_topics_bulk(
+            [(m['course_id'], m['topic_text']) for m in matches],
+            per_limit=6,
         )
+        for m in matches:
+            m['topic_matches'] = neighbor_map.get((m['course_id'], m['topic_text']), [])
 
     # All unique courses across both phases
     seen: set = set()
@@ -124,26 +178,22 @@ def search_topics(
             seen.add(m['course_id'])
             courses.append(m['course_id'])
 
-    # Pairwise similarities for every unique course pair in the result set
-    pairs: list[dict] = []
-    for i, ca in enumerate(courses):
-        for cb in courses[i + 1:]:
-            sim = pg_store.get_similarity(ca, cb)
-            if sim:
-                pairs.append(sim)
+    # Batched pairwise similarities (one query for all C*(C-1)/2 pairs).
+    course_pair_keys: list[tuple[str, str]] = [
+        (ca, cb) for i, ca in enumerate(courses) for cb in courses[i + 1:]
+    ]
+    sim_map = pg_store.get_similarities_bulk(course_pair_keys)
+    pairs = list(sim_map.values())
 
-    # Attach cached explanations to related items
-    for r in related:
-        r['explanation'] = None
-        r['signed_by']   = None
-
-    return {
+    payload = {
         "query":        q,
         "matches":      matches,   # direct text/tag hits
         "related":      related,   # cross-domain via shared tags
         "courses":      courses,
         "course_pairs": pairs,
     }
+    _cache_put(cache_key, payload)
+    return payload
 
 
 @router.post("/explain")

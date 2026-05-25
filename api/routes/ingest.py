@@ -79,6 +79,9 @@ def _run_ingest(course_id: str, course_name: str, raw_text: str, api_key: str | 
     try:
      _run_ingest_inner(course_id, course_name, raw_text, api_key)
      _ingest_status[course_id] = {"status": "done", "message": ""}
+     # Topics search results just got stale; drop any cached responses.
+     from api.routes.topics import invalidate_search_cache
+     invalidate_search_cache()
     except Exception as e:
         msg = str(e)
         print(f"[ingest] ✗ FAILED: {msg}")
@@ -250,6 +253,8 @@ def _run_append(course_id: str, course_name: str, raw_text: str, api_key: str | 
     try:
         _run_append_inner(course_id, course_name, raw_text, api_key)
         _ingest_status[course_id] = {"status": "done", "message": ""}
+        from api.routes.topics import invalidate_search_cache
+        invalidate_search_cache()
     except Exception as e:
         msg = str(e)
         print(f"[append] ✗ FAILED: {msg}")

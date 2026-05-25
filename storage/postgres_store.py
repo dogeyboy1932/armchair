@@ -116,6 +116,13 @@ CREATE TABLE IF NOT EXISTS topic_explanations (
     generated_at   TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (source_course, source_topic, target_course, target_topic)
 );
+-- /topics/search hits topic_similarity from both sides of the symmetric pair.
+-- PK covers (course_a, topic_a, ...); we just need the mirror for course_b lookups.
+CREATE INDEX IF NOT EXISTS topic_similarity_b_idx
+    ON topic_similarity (course_b, topic_b);
+-- Speeds up tag-array containment lookups in find_related_by_tags (tags ?| ...).
+CREATE INDEX IF NOT EXISTS topic_categories_tags_gin
+    ON topic_categories USING GIN (tags);
 """
 
 
@@ -402,14 +409,13 @@ def find_related_by_tags(tags: list[str], exclude_courses: list[str]) -> list[di
     if not tags or not exclude_courses:
         return []
     with _Conn() as cur:
+        # tags ?| ARRAY[...] uses the GIN(tags) index — orders of magnitude
+        # faster than the previous jsonb_array_elements_text(...) subquery.
         cur.execute("""
             SELECT course_id, topic_text, categories, COALESCE(tags, '[]') AS tags
             FROM topic_categories
             WHERE course_id != ALL(%s::text[])
-              AND EXISTS (
-                  SELECT 1 FROM jsonb_array_elements_text(COALESCE(tags, '[]')) t
-                  WHERE t = ANY(%s::text[])
-              )
+              AND tags ?| %s::text[]
             ORDER BY course_id, topic_text
             LIMIT 50
         """, (exclude_courses, tags))
@@ -466,6 +472,107 @@ def get_similar_topics(course_id: str, topic_text: str, limit: int = 8) -> list[
         rows = cur.fetchall()
     return [{"course_id": r[0], "topic_text": r[1], "sem_score": round(r[2], 4)}
             for r in rows]
+
+
+def get_similar_topics_bulk(
+    pairs: list[tuple[str, str]],
+    per_limit: int = 6,
+) -> dict[tuple[str, str], list[dict]]:
+    """
+    Batched version of get_similar_topics: one query per /topics/search call
+    instead of N. Returns {(course_id, topic_text): [neighbors...]}.
+
+    Each list is capped at per_limit and ordered by sem_score DESC.
+    """
+    if not pairs:
+        return {}
+
+    with _Conn() as cur:
+        # Inline the (course_id, topic_text) pairs as a VALUES literal via
+        # mogrify (which handles escaping). The whole search collapses to one
+        # round trip — replacing what used to be N sequential queries.
+        values_sql = ",".join(
+            cur.mogrify("(%s,%s)", p).decode() for p in pairs
+        )
+        cur.execute(f"""
+            WITH input(qc, qt) AS (
+                SELECT v.qc, v.qt FROM (VALUES {values_sql}) AS v(qc, qt)
+            ),
+            all_neighbors AS (
+                SELECT i.qc, i.qt, ts.course_b AS nc, ts.topic_b AS nt, ts.sem_score
+                FROM input i
+                JOIN topic_similarity ts
+                  ON ts.course_a = i.qc AND ts.topic_a = i.qt
+                UNION ALL
+                SELECT i.qc, i.qt, ts.course_a AS nc, ts.topic_a AS nt, ts.sem_score
+                FROM input i
+                JOIN topic_similarity ts
+                  ON ts.course_b = i.qc AND ts.topic_b = i.qt
+            ),
+            deduped AS (
+                SELECT qc, qt, nc, nt, MAX(sem_score) AS sem_score
+                FROM all_neighbors
+                GROUP BY qc, qt, nc, nt
+            ),
+            ranked AS (
+                SELECT qc, qt, nc, nt, sem_score,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY qc, qt ORDER BY sem_score DESC
+                       ) AS rn
+                FROM deduped
+            )
+            SELECT qc, qt, nc, nt, sem_score
+            FROM ranked
+            WHERE rn <= %s
+            ORDER BY qc, qt, sem_score DESC
+        """, (per_limit,))
+        rows = cur.fetchall()
+
+    out: dict[tuple[str, str], list[dict]] = {p: [] for p in pairs}
+    for qc, qt, nc, nt, sem_score in rows:
+        out.setdefault((qc, qt), []).append({
+            "course_id":  nc,
+            "topic_text": nt,
+            "sem_score":  round(sem_score, 4),
+        })
+    return out
+
+
+def get_similarities_bulk(
+    course_pairs: list[tuple[str, str]],
+) -> dict[tuple[str, str], dict]:
+    """
+    Batched version of get_similarity for many pairs. Returns
+    {(course_a_sorted, course_b_sorted): record}. One round trip total.
+    """
+    if not course_pairs:
+        return {}
+
+    # Normalize each pair to the sorted form stored in similarity_cache.
+    norm = sorted({tuple(sorted(p)) for p in course_pairs})
+
+    with _Conn() as cur:
+        in_sql = ",".join(cur.mogrify("(%s,%s)", p).decode() for p in norm)
+        cur.execute(f"""
+            SELECT course_a, course_b, final_score, lex_score, sem_score, jsd,
+                   driving_terms, category_jsd, non_obvious_score, llm_explanation
+            FROM similarity_cache
+            WHERE (course_a, course_b) IN ({in_sql})
+        """)
+        rows = cur.fetchall()
+
+    return {
+        (r[0], r[1]): {
+            "course_a":           r[0], "course_b":           r[1],
+            "final_score":        r[2], "lex_score":          r[3],
+            "sem_score":          r[4], "jsd":                r[5],
+            "driving_terms":      json.loads(r[6]) if r[6] else [],
+            "category_jsd":       r[7],
+            "non_obvious_score":  r[8],
+            "llm_explanation":    r[9],
+        }
+        for r in rows
+    }
 
 
 def get_topic_context(course_id: str, topic_text: str) -> dict:
