@@ -1,0 +1,53 @@
+# Full-fat production image. Mirrors local capabilities so production can do
+# everything local can: PDF ingest, SciNCL encoding, topic graph builds,
+# label_categories, etc. Larger image (~1.5 GB) but no cold-start downloads.
+#
+# Run maintenance ops via:
+#   flyctl ssh console --app <app>
+#   cd /app && python scripts/<script>.py
+
+FROM python:3.12-slim
+
+# System deps: libpq for psycopg2, libgomp for torch CPU, build-essential for any
+# wheels that compile, plus poppler for pdfplumber's pdfminer.six.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpq5 \
+        libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install CPU-only PyTorch wheel first so sentence-transformers doesn't pull the
+# 2 GB CUDA build.
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu "torch>=2.0,<3.0"
+
+COPY requirements-api.txt ./
+RUN pip install --no-cache-dir -r requirements-api.txt
+
+# Bake the SciNCL model into the image so cold starts skip the 420 MB download.
+ENV SCINCL_CACHE_DIR=/app/.model_cache
+RUN python -c "from sentence_transformers import SentenceTransformer; \
+SentenceTransformer('malteos/scincl', cache_folder='/app/.model_cache')"
+
+# Bake NLTK stopwords (chunker.py imports them at module load).
+ENV NLTK_DATA=/usr/share/nltk_data
+RUN python -c "import nltk; nltk.download('stopwords', download_dir='/usr/share/nltk_data', quiet=True)"
+
+# App code. scripts/ is included so maintenance ops are runnable via `fly ssh`.
+COPY api/        ./api/
+COPY scoring/    ./scoring/
+COPY storage/    ./storage/
+COPY pipeline/   ./pipeline/
+COPY public/     ./public/
+COPY scripts/    ./scripts/
+COPY config.py   ./
+COPY data/       ./data/
+
+ENV VECTOR_BACKEND=pgvector
+ENV POSTGRES_SSLMODE=require
+ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 8080
+CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8080}"]

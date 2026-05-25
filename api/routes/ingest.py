@@ -3,24 +3,42 @@ import time
 import tempfile
 from pathlib import Path
 
-import pdfplumber
 from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPException, UploadFile
 
 import config
-from pipeline.chunker          import chunk_course
-from pipeline.encoder          import encode
-from pipeline.topic_extractor  import analyze_course, extract_topics
-from pipeline.category_labeler import label_topic
 from scoring.driving_terms     import compute_idf
 from scoring.hybrid_scorer     import score_pair
 from scoring.language_model    import build_all_lms
 from scoring.category_scorer   import course_category_vector
-from storage import milvus_store  as milvus
+from storage import vector_store  as milvus
 from storage import neo4j_store   as neo4j
 from storage import postgres_store as pg_store
 
+# Heavy ingest-only deps (PDF parsing, ML model, LLM extractors). These are
+# omitted from the slim production container — when missing the upload routes
+# return 503 instead of crashing at import time.
+try:
+    import pdfplumber  # type: ignore
+    from pipeline.chunker          import chunk_course
+    from pipeline.encoder          import encode
+    from pipeline.topic_extractor  import analyze_course, extract_topics
+    from pipeline.category_labeler import label_topic
+    _INGEST_AVAILABLE = True
+    _INGEST_DISABLED_REASON = ""
+except ImportError as _e:
+    _INGEST_AVAILABLE = False
+    _INGEST_DISABLED_REASON = (
+        "PDF/topic-ingest disabled in this deployment (missing optional deps: "
+        f"{_e.name}). Run seed.py / build_graph.py locally to refresh data."
+    )
+
 router = APIRouter()
+
+
+def _require_ingest():
+    if not _INGEST_AVAILABLE:
+        raise HTTPException(503, detail=_INGEST_DISABLED_REASON)
 
 # Tracks background ingest state so the UI can poll for errors
 # {course_id: {"status": "running"|"done"|"error", "message": str}}
@@ -193,6 +211,7 @@ async def ingest_pdf(
     After ~60 s the new course is fully integrated: similarity scores, category
     distributions, non_obvious_score, and LLM explanations are all populated.
     """
+    _require_ingest()
     if not x_api_key:
         raise HTTPException(400, detail="API key required. Set your Gemini API key using the ⚙ button in the app.")
     if Path(file.filename).suffix.lower() not in _ALLOWED_EXTENSIONS:
@@ -339,6 +358,7 @@ async def append_material(
     scores. Cached LLM explanations for this course's pairs are invalidated so
     they reflect the enriched course content on next request.
     """
+    _require_ingest()
     if not x_api_key:
         raise HTTPException(400, detail="API key required. Set your Gemini API key using the ⚙ button in the app.")
     if Path(file.filename).suffix.lower() not in _ALLOWED_EXTENSIONS:

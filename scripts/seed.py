@@ -14,7 +14,7 @@ import config
 from pipeline.chunker  import chunk_course
 from pipeline.encoder  import encode
 from storage import postgres_store as pg_store
-from storage import milvus_store   as milvus
+from storage import vector_store   as milvus
 from storage import neo4j_store    as neo4j
 
 

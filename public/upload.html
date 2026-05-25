@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SIIP — Upload Syllabus</title>
+  <script src="config.js" onerror="this.remove();"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -310,24 +311,24 @@
 <div class="page">
   <div class="card">
     <div class="card-header">
-      <h1 id="card-title">Upload Course Material</h1>
-      <p id="card-desc">Add a new course or append supplementary material to an existing one.</p>
+      <h1 id="card-title">Add a syllabus</h1>
+      <p id="card-desc">Upload a course PDF and we'll fold it into the map — topics extracted, similarity scored, graph updated. Usually under a minute.</p>
     </div>
 
     <div class="card-body">
       <!-- Mode toggle -->
       <div style="display:flex; gap:8px; margin-bottom:24px;">
         <button type="button" id="btn-mode-new" onclick="setMode('new')"
-          style="flex:1; padding:9px; border-radius:8px; font-size:.82rem; font-weight:600;
+          style="flex:1; padding:10px; border-radius:8px; font-size:.82rem; font-weight:600;
                  cursor:pointer; border:1px solid rgba(129,140,248,0.5);
                  background:rgba(129,140,248,0.15); color:#a5b4fc; transition:all .15s;">
-          + New Course
+          New course
         </button>
         <button type="button" id="btn-mode-append" onclick="setMode('append')"
-          style="flex:1; padding:9px; border-radius:8px; font-size:.82rem; font-weight:600;
+          style="flex:1; padding:10px; border-radius:8px; font-size:.82rem; font-weight:600;
                  cursor:pointer; border:1px solid #2d3148;
                  background:transparent; color:#475569; transition:all .15s;">
-          ↑ Append to Existing
+          Add to an existing course
         </button>
       </div>
 
@@ -378,7 +379,7 @@
           </div>
         </div>
 
-        <button type="submit" id="btn-upload" disabled>Upload &amp; Ingest</button>
+        <button type="submit" id="btn-upload" disabled>Add to the map</button>
       </form>
 
 
@@ -390,40 +391,42 @@
       </div>
 
       <div class="status info" id="status-polling">
-        <div class="status-title">⏳ Ingesting course…</div>
+        <div class="status-title">Working on it…</div>
         <div class="status-body" id="status-polling-text">
-          The pipeline is running in the background — parsing, embedding, and scoring similarity pairs.
+          We're parsing the PDF and scoring how this course connects to every other course.
           This takes about 30–60 seconds.
         </div>
         <div class="progress-wrap"><div class="progress-bar indeterminate"></div></div>
       </div>
 
       <div class="status success" id="status-success">
-        <div class="status-title">✓ Course successfully added!</div>
+        <div class="status-title">✓ Added to the map</div>
         <div class="status-body" id="status-success-text"></div>
         <div class="action-links">
-          <a class="action-btn primary" href="/?view=explorer">Open Explorer</a>
-          <a class="action-btn primary" href="/">View Graph</a>
-          <a class="action-btn ghost" href="/upload" onclick="resetForm(); return false;">Upload Another</a>
+          <a class="action-btn primary" href="/?view=explorer">Open Courses</a>
+          <a class="action-btn primary" href="/">View the map</a>
+          <a class="action-btn ghost" href="/upload" onclick="resetForm(); return false;">Add another</a>
         </div>
       </div>
 
       <div class="status error" id="status-error">
-        <div class="status-title">Upload Failed</div>
+        <div class="status-title">Something went wrong</div>
         <div class="status-body" id="status-error-text"></div>
       </div>
 
       <div class="info-note" id="info-note">
-        <strong>New course:</strong> LLM extracts topics + assigns category distributions. SciNCL embeds chunks into Milvus. Hybrid similarity scored against all courses. Neo4j graph updated with community detection.
+        <strong>What happens next:</strong> we pull topics from the PDF, label them, embed the text, and score how similar this course is to every other course already in the map. You'll be able to find it in <em>Courses</em> and <em>Search Topics</em> within ~60 seconds.
       </div>
     </div>
   </div>
 </div>
 
 <script>
-const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:8080'
-  : window.location.origin;
+const API = (typeof window.__SIIP_API__ === 'string' && window.__SIIP_API__)
+  ? window.__SIIP_API__.replace(/\/+$/, '')
+  : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:8080'
+      : window.location.origin);
 let selectedFile   = null;
 let pollingInterval = null;
 let currentMode    = 'new'; // 'new' | 'append'
@@ -452,14 +455,14 @@ function setMode(mode) {
   btnAppend.style.borderColor= isNew ? '#2d3148' : 'rgba(52,211,153,0.4)';
 
   document.getElementById('card-title').textContent = isNew
-    ? 'Upload New Course' : 'Append Material to Course';
+    ? 'Add a syllabus' : 'Add material to a course';
   document.getElementById('card-desc').textContent = isNew
-    ? 'Add a new course to the knowledge graph. LLM extracts topics, scores are computed against all existing courses.'
-    : 'Add lecture notes, slides, or readings to an existing course. New topics are extracted, embedded, and all scores recompile.';
+    ? "Upload a course PDF and we'll fold it into the map — topics extracted, similarity scored, graph updated. Usually under a minute."
+    : "Drop in lecture notes, slides, or extra reading. We'll add new topics to the course and re-score how it relates to everything else.";
   document.getElementById('info-note').innerHTML = isNew
-    ? '<strong>New course:</strong> LLM extracts topics + assigns category distributions. SciNCL embeds chunks into Milvus. Hybrid similarity scored against all courses. Neo4j graph updated.'
-    : '<strong>Append:</strong> New topics extracted by LLM and labeled. New chunks embedded and added to Milvus alongside existing ones. Term counts accumulated. All similarity scores recompiled.';
-  document.getElementById('btn-upload').textContent = isNew ? 'Upload & Ingest' : 'Append & Recompile';
+    ? "<strong>What happens next:</strong> we pull topics from the PDF, label them, embed the text, and score how similar this course is to every other course already in the map. You'll be able to find it in <em>Courses</em> and <em>Search Topics</em> within ~60 seconds."
+    : "<strong>What happens next:</strong> the new material is broken into topics and merged with what we already have for this course. All similarity scores are recomputed so the rest of the map stays in sync.";
+  document.getElementById('btn-upload').textContent = isNew ? 'Add to the map' : 'Update the course';
 
   checkReady();
 }

@@ -4,69 +4,333 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SIIP</title>
+  <script src="config.js" onerror="this.remove();"></script>
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <style>
+    /* ════════════════════════════════════════════════════════════════
+       SIIP design tokens
+       Edit a value here once and it cascades everywhere.
+       Light theme is opt-in via <html data-theme="light">.
+    ════════════════════════════════════════════════════════════════ */
+    :root {
+      /* Surfaces (darkest → lightest) */
+      --bg-app:        #0b0d14;
+      --bg-canvas:     #0c0f1a;
+      --bg-surface-1:  #111420;
+      --bg-surface-2:  #1a1d2e;
+      --bg-surface-3:  #232740;
+      --bg-overlay:    rgba(13, 16, 28, 0.78);
+
+      /* Borders */
+      --border-faint:  #1e2235;
+      --border-soft:   #2d3148;
+      --border-strong: rgba(165, 180, 252, 0.18);
+
+      /* Text */
+      --text-strong: #e8edf8;
+      --text-base:   #cbd5e1;
+      --text-muted:  #94a3b8;
+      --text-dim:    #64748b;
+      --text-faint:  #475569;
+
+      /* Brand + accents */
+      --accent:        #818cf8;   /* indigo: primary actions, links */
+      --accent-soft:   rgba(129, 140, 248, 0.14);
+      --accent-strong: #6366f1;
+      --good:          #34d399;   /* green: success, strong scores */
+      --warn:          #fbbf24;   /* gold: highlighted path, signed */
+      --surprise:      #f97316;   /* orange: non-obvious / surprises */
+      --info:          #22d3ee;   /* cyan: secondary metrics */
+      --danger:        #f87171;
+
+      /* Radii */
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 20px;
+      --radius-pill: 999px;
+
+      /* Shadows */
+      --shadow-1: 0 1px 2px rgba(0,0,0,0.4);
+      --shadow-2: 0 4px 16px rgba(0,0,0,0.45);
+      --shadow-3: 0 12px 32px rgba(0,0,0,0.55);
+      --shadow-glow: 0 0 0 3px rgba(129,140,248,0.18);
+
+      /* Typography */
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
+      --font-mono: "JetBrains Mono", "SF Mono", Menlo, ui-monospace, monospace;
+
+      /* Motion */
+      --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Light theme — opt in by setting data-theme="light" on <html>. */
+    html[data-theme="light"] {
+      --bg-app:        #f6f7fb;
+      --bg-canvas:     #ffffff;
+      --bg-surface-1:  #ffffff;
+      --bg-surface-2:  #eef0f7;
+      --bg-surface-3:  #e3e7f1;
+      --bg-overlay:    rgba(255, 255, 255, 0.86);
+
+      --border-faint:  #e2e6f0;
+      --border-soft:   #d0d6e2;
+      --border-strong: rgba(79, 70, 229, 0.22);
+
+      --text-strong: #0f172a;
+      --text-base:   #1f2937;
+      --text-muted:  #475569;
+      --text-dim:    #64748b;
+      --text-faint:  #94a3b8;
+
+      --accent:        #4f46e5;
+      --accent-soft:   rgba(79, 70, 229, 0.10);
+      --accent-strong: #4338ca;
+      --good:          #059669;
+      --warn:          #d97706;
+      --surprise:      #ea580c;
+      --info:          #0891b2;
+      --danger:        #dc2626;
+
+      --shadow-1: 0 1px 2px rgba(15,23,42,0.06);
+      --shadow-2: 0 6px 18px rgba(15,23,42,0.10);
+      --shadow-3: 0 18px 40px rgba(15,23,42,0.16);
+      --shadow-glow: 0 0 0 3px rgba(79,70,229,0.18);
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0b0d14;
-      color: #e2e8f0;
+      font-family: var(--font-sans);
+      background: var(--bg-app);
+      color: var(--text-base);
       height: 100vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    *:focus-visible {
+      outline: none;
+      box-shadow: var(--shadow-glow);
+      border-radius: var(--radius-sm);
     }
 
     /* ── Nav ── */
     nav {
       display: flex;
       align-items: center;
-      background: #111420;
-      border-bottom: 1px solid #1e2235;
-      padding: 0 20px;
-      height: 52px;
+      background: var(--bg-surface-1);
+      border-bottom: 1px solid var(--border-faint);
+      padding: 0 24px;
+      height: 58px;
       flex-shrink: 0;
-      gap: 0;
+      gap: 16px;
     }
     .nav-brand {
-      font-size: 1rem;
+      display: flex; align-items: center; gap: 9px;
+      font-size: 0.92rem;
       font-weight: 800;
-      background: linear-gradient(135deg, #818cf8 0%, #34d399 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      letter-spacing: 0.08em;
-      margin-right: 24px;
+      letter-spacing: 0.14em;
+      color: var(--text-strong);
       white-space: nowrap;
     }
-    .nav-links { display: flex; gap: 4px; flex: 1; }
+    .nav-brand .brand-mark {
+      width: 22px; height: 22px; border-radius: 7px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--good) 100%);
+      box-shadow: 0 0 14px rgba(129,140,248,0.45);
+      display: inline-block;
+    }
+    .nav-brand .brand-tag {
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: var(--text-faint);
+      text-transform: none;
+      margin-left: 4px;
+    }
+    .nav-links { display: flex; gap: 2px; }
     .nav-tab {
-      padding: 6px 14px;
-      border-radius: 6px;
-      font-size: 0.82rem;
+      padding: 8px 16px;
+      border-radius: var(--radius-md);
+      font-size: 0.85rem;
       font-weight: 500;
-      color: #64748b;
+      color: var(--text-dim);
       text-decoration: none;
-      transition: all .15s;
+      transition: color .15s var(--ease), background .15s var(--ease);
       cursor: pointer;
       border: none;
       background: none;
+      font-family: inherit;
     }
-    .nav-tab:hover { color: #e2e8f0; background: #1e2235; }
-    .nav-tab.active { color: #818cf8; background: rgba(129,140,248,0.1); }
-    .nav-upload {
-      padding: 6px 14px;
-      border-radius: 6px;
+    .nav-tab:hover { color: var(--text-strong); background: var(--bg-surface-2); }
+    .nav-tab.active {
+      color: var(--accent);
+      background: var(--accent-soft);
+      box-shadow: inset 0 0 0 1px var(--border-strong);
+    }
+    .nav-actions {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .icon-btn {
+      width: 36px; height: 36px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: var(--radius-md);
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all .15s var(--ease);
+    }
+    .icon-btn:hover {
+      color: var(--text-strong);
+      background: var(--bg-surface-2);
+      border-color: var(--border-faint);
+    }
+    .icon-btn svg { width: 18px; height: 18px; }
+
+    .nav-cta {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px;
+      border-radius: var(--radius-md);
       font-size: 0.82rem;
       font-weight: 500;
-      color: #34d399;
+      color: var(--text-base);
       text-decoration: none;
-      border: 1px solid rgba(52,211,153,0.3);
-      margin-left: auto;
-      transition: all .15s;
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-soft);
+      transition: all .15s var(--ease);
     }
-    .nav-upload:hover { background: rgba(52,211,153,0.1); }
+    .nav-cta:hover {
+      color: var(--good);
+      border-color: rgba(52,211,153,0.4);
+      background: rgba(52,211,153,0.08);
+    }
+    .nav-cta svg { width: 14px; height: 14px; }
+
+    /* ── Settings panel ── */
+    #api-key-panel {
+      background: var(--bg-surface-2);
+      border-bottom: 1px solid var(--border-faint);
+      padding: 12px 24px;
+    }
+    .settings-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .settings-label { display: flex; flex-direction: column; gap: 2px; flex: 0 1 320px; }
+    .settings-label strong { font-size: 0.82rem; color: var(--text-strong); font-weight: 600; }
+    .settings-label span { font-size: 0.72rem; color: var(--text-dim); line-height: 1.45; }
+    #api-key-input {
+      flex: 1; min-width: 200px;
+      background: var(--bg-canvas); color: var(--text-base);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px; font-size: 0.82rem; font-family: var(--font-mono);
+      outline: none;
+    }
+    #api-key-input:focus { border-color: var(--accent); }
+    .settings-done {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      padding: 7px 16px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .settings-done:hover { background: rgba(129,140,248,0.22); }
+
+    /* ── Welcome / onboarding modal ── */
+    .welcome-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: radial-gradient(ellipse at center, rgba(15,18,30,0.7) 0%, rgba(6,8,15,0.94) 80%);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      opacity: 0; visibility: hidden; transition: opacity .25s var(--ease), visibility .25s var(--ease);
+    }
+    .welcome-overlay.active { opacity: 1; visibility: visible; }
+    .welcome-card {
+      width: 100%; max-width: 600px;
+      background: var(--bg-surface-1);
+      border: 1px solid var(--border-faint);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-3);
+      padding: 36px 38px 30px;
+      transform: translateY(8px) scale(0.98);
+      transition: transform .25s var(--ease);
+    }
+    .welcome-overlay.active .welcome-card { transform: none; }
+    .welcome-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 0.7rem; font-weight: 600;
+      color: var(--accent); letter-spacing: 0.14em; text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .welcome-eyebrow::before {
+      content: ""; width: 22px; height: 2px; background: linear-gradient(90deg, var(--accent), transparent);
+    }
+    .welcome-card h1 {
+      font-size: 1.7rem; font-weight: 700; line-height: 1.2;
+      color: var(--text-strong); margin-bottom: 12px;
+      letter-spacing: -0.01em;
+    }
+    .welcome-card .lede {
+      font-size: 0.92rem; color: var(--text-muted); line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .welcome-actions {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
+      margin-bottom: 18px;
+    }
+    .welcome-action {
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-faint);
+      border-radius: var(--radius-md);
+      padding: 14px 14px 13px;
+      cursor: pointer; text-align: left;
+      transition: all .15s var(--ease);
+      color: var(--text-base);
+      font-family: inherit;
+    }
+    .welcome-action:hover {
+      border-color: var(--border-strong);
+      transform: translateY(-1px);
+      background: var(--bg-surface-3);
+    }
+    .welcome-action .wa-icon {
+      width: 30px; height: 30px; border-radius: 8px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--accent-soft); color: var(--accent);
+      margin-bottom: 10px;
+    }
+    .welcome-action .wa-icon svg { width: 16px; height: 16px; }
+    .welcome-action h3 {
+      font-size: 0.85rem; font-weight: 600; color: var(--text-strong);
+      margin-bottom: 4px;
+    }
+    .welcome-action p {
+      font-size: 0.72rem; color: var(--text-dim); line-height: 1.45;
+    }
+    .welcome-foot {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-top: 16px; border-top: 1px solid var(--border-faint);
+      font-size: 0.75rem; color: var(--text-faint);
+    }
+    .welcome-foot button {
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 0.78rem; font-family: inherit;
+      padding: 4px 8px; border-radius: var(--radius-sm);
+    }
+    .welcome-foot button:hover { color: var(--text-strong); background: var(--bg-surface-2); }
+    @media (max-width: 540px) {
+      .welcome-actions { grid-template-columns: 1fr; }
+      .welcome-card { padding: 28px 22px 22px; }
+      .welcome-card h1 { font-size: 1.35rem; }
+    }
 
     /* ── View switching ── */
     .view { display: none; flex: 1; flex-direction: column; overflow: hidden; }
@@ -79,81 +343,154 @@
     .toolbar {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 8px 20px;
-      background: #111420;
-      border-bottom: 1px solid #1e2235;
+      gap: 14px;
+      padding: 10px 24px;
+      background: var(--bg-surface-1);
+      border-bottom: 1px solid var(--border-faint);
       flex-shrink: 0;
       flex-wrap: wrap;
     }
-    .toolbar-group { display: flex; align-items: center; gap: 8px; }
-    .toolbar-group + .toolbar-group { padding-left: 12px; border-left: 1px solid #1e2235; }
-    .toolbar label { font-size: 0.75rem; color: #64748b; white-space: nowrap; }
-    .toolbar input[type=range] { width: 100px; accent-color: #818cf8; cursor: pointer; }
-    .toolbar input[type=text] {
-      background: #1a1d2e;
-      border: 1px solid #2d3148;
-      border-radius: 6px;
-      color: #e2e8f0;
-      padding: 5px 10px;
-      font-size: 0.8rem;
-      width: 140px;
-      transition: border-color .15s;
+    .toolbar-group { display: flex; align-items: center; gap: 10px; }
+    .toolbar-group + .toolbar-group { padding-left: 14px; border-left: 1px solid var(--border-faint); }
+    .toolbar label { font-size: 0.78rem; color: var(--text-dim); white-space: nowrap; }
+    .toolbar input[type=range] {
+      width: 120px;
+      accent-color: var(--accent);
+      cursor: pointer;
     }
-    .toolbar input[type=text]:focus { outline: none; border-color: #818cf8; }
+    .toolbar input[type=text] {
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-sm);
+      color: var(--text-base);
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      width: 150px;
+      transition: border-color .15s var(--ease);
+      font-family: inherit;
+    }
+    .toolbar input[type=text]:focus { outline: none; border-color: var(--accent); }
+    .toolbar input[type=text]::placeholder { color: var(--text-faint); }
     .val-badge {
-      font-size: 0.75rem;
-      color: #818cf8;
-      background: rgba(129,140,248,0.12);
-      padding: 2px 8px;
-      border-radius: 10px;
-      min-width: 36px;
+      font-size: 0.78rem;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 3px 10px;
+      border-radius: var(--radius-pill);
+      min-width: 38px;
       text-align: center;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
     }
     .btn {
-      padding: 5px 14px;
-      border-radius: 6px;
-      border: none;
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
       cursor: pointer;
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       font-weight: 500;
-      transition: all .15s;
+      transition: all .15s var(--ease);
       white-space: nowrap;
+      font-family: inherit;
+      display: inline-flex; align-items: center; gap: 6px;
     }
-    .btn-primary { background: #3730a3; color: #e0e7ff; }
-    .btn-primary:hover { background: #4338ca; }
-    .btn-ghost { background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px solid #2d3148; }
-    .btn-ghost:hover { background: rgba(255,255,255,0.09); color: #e2e8f0; }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      box-shadow: var(--shadow-1);
+    }
+    .btn-primary:hover { background: var(--accent-strong); transform: translateY(-1px); box-shadow: var(--shadow-2); }
+    .btn-ghost {
+      background: var(--bg-surface-2);
+      color: var(--text-muted);
+      border-color: var(--border-soft);
+    }
+    .btn-ghost:hover { background: var(--bg-surface-3); color: var(--text-strong); }
+    .btn-toggle {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--border-soft);
+    }
+    .btn-toggle:hover { color: var(--text-strong); border-color: var(--border-strong); }
+    .btn-toggle.active {
+      background: rgba(249, 115, 22, 0.10);
+      color: var(--surprise);
+      border-color: rgba(249, 115, 22, 0.45);
+    }
+    .toolbar-help {
+      margin-left: 4px; font-size: 0.72rem; color: var(--text-faint);
+      cursor: help;
+      width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 50%; border: 1px solid var(--border-soft);
+    }
 
     .graph-main { display: flex; flex: 1; overflow: hidden; }
-    #graph-wrap { flex: 1; position: relative; overflow: hidden; }
-    #graph-wrap svg { width: 100%; height: 100%; }
+    #graph-wrap {
+      flex: 1; position: relative; overflow: hidden;
+      background:
+        radial-gradient(ellipse 75% 55% at 50% 45%,
+          #1a1f36 0%,
+          #0c0f1a 65%,
+          #06080f 100%);
+    }
+    #graph-wrap svg { width: 100%; height: 100%; display: block; }
 
-    .link { stroke: #2d3668; stroke-opacity: 0.5; fill: none; transition: stroke .1s, stroke-opacity .1s; }
-    .link.highlighted { stroke: rgba(129,140,248,0.7); stroke-opacity: 1; }
-    .link.on-path { stroke: #fbbf24 !important; stroke-opacity: 1 !important; stroke-width: 2px !important; }
-    .link.dimmed { stroke-opacity: 0.08; }
+    /* ─── Edges ─── stroke colour is set per-edge in JS based on score */
+    .link {
+      fill: none;
+      stroke-opacity: 0.55;
+      stroke-linecap: round;
+      transition: stroke .12s, stroke-opacity .12s, stroke-width .12s, filter .12s;
+    }
+    .link.highlighted {
+      stroke-opacity: 1;
+      filter: drop-shadow(0 0 4px currentColor);
+    }
+    .link.on-path {
+      stroke: #fbbf24 !important;
+      stroke-opacity: 1 !important;
+      stroke-width: 2.5px !important;
+      filter: drop-shadow(0 0 5px rgba(251,191,36,0.85));
+    }
+    .link.dimmed { stroke-opacity: 0.06; filter: none; }
 
+    /* ─── Nodes ─── parent <g> sets `color: <communityColor>` so the
+       drop-shadow on circle/text uses that same hue automatically. */
     .node circle {
       cursor: pointer;
-      stroke: #0b0d14;
-      stroke-width: 1.5px;
-      transition: stroke .12s, stroke-width .12s, filter .12s;
+      stroke: rgba(0,0,0,0.5);
+      stroke-width: 1.25px;
+      filter: drop-shadow(0 0 6px currentColor);
+      transition: stroke .15s, stroke-width .15s, filter .15s, opacity .15s;
     }
-    .node circle:hover { stroke: #fff; stroke-width: 2px; filter: brightness(1.25); }
-    .node.selected circle { stroke: #fbbf24; stroke-width: 2.5px; filter: brightness(1.3); }
-    .node.on-path circle { stroke: #fbbf24 !important; stroke-width: 2.5px !important; }
-    .node.dimmed circle { opacity: 0.18; }
-    .node.dimmed text { opacity: 0.18; }
+    .node:hover circle {
+      stroke: rgba(255,255,255,0.75);
+      stroke-width: 1.5px;
+      filter: drop-shadow(0 0 14px currentColor) brightness(1.15);
+    }
+    .node.selected circle {
+      stroke: #fbbf24;
+      stroke-width: 2.5px;
+      filter: drop-shadow(0 0 16px #fbbf24) brightness(1.1);
+    }
+    .node.on-path circle {
+      stroke: #fbbf24 !important;
+      stroke-width: 2.5px !important;
+      filter: drop-shadow(0 0 14px rgba(251,191,36,0.9));
+    }
+    .node.dimmed circle { opacity: 0.14; filter: none; }
+    .node.dimmed text   { opacity: 0.18; }
+
     .node text {
-      font-size: 9.5px;
-      fill: #94a3b8;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      fill: #e8edf8;
       pointer-events: none;
       text-anchor: middle;
-      dominant-baseline: auto;
       paint-order: stroke;
-      stroke: #0b0d14;
-      stroke-width: 3px;
+      stroke: rgba(6,9,16,0.88);
+      stroke-width: 3.5px;
       stroke-linejoin: round;
     }
     .node.selected text, .node.on-path text { fill: #fbbf24; }
@@ -190,14 +527,27 @@
     .metric-value { font-size: 1.1rem; font-weight: 700; color: #818cf8; margin-top: 3px; }
 
     .g-neighbor-row {
-      display: flex; align-items: center; gap: 8px; padding: 7px 8px;
-      border-radius: 6px; cursor: pointer; transition: background .1s; margin-bottom: 2px;
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+      border-radius: var(--radius-sm); cursor: pointer;
+      transition: background .12s var(--ease);
+      margin-bottom: 2px;
     }
-    .g-neighbor-row:hover { background: #1a1d2e; }
-    .g-neighbor-name { flex: 1; font-size: 0.8rem; color: #cbd5e1; }
-    .score-track { flex: none; width: 54px; background: #1a1d2e; border-radius: 3px; height: 4px; overflow: hidden; }
-    .score-fill { height: 4px; border-radius: 3px; background: linear-gradient(90deg, #818cf8, #34d399); }
-    .score-num { font-size: 0.7rem; color: #64748b; min-width: 30px; text-align: right; }
+    .g-neighbor-row:hover { background: var(--bg-surface-2); }
+    .g-neighbor-name { flex: 1; font-size: 0.82rem; color: var(--text-base); font-weight: 500; }
+    .score-track { flex: none; width: 50px; background: var(--bg-surface-2); border-radius: 3px; height: 4px; overflow: hidden; }
+    .score-fill { height: 4px; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--good)); }
+    .score-num { font-size: 0.72rem; color: var(--text-dim); min-width: 30px; text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Strength pill — replaces raw decimals in the similar-courses list */
+    .strength-pill {
+      font-size: 0.65rem; font-weight: 600;
+      padding: 2px 8px; border-radius: var(--radius-pill);
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .strength-high { background: rgba(52,211,153,0.14);  color: var(--good);     border: 1px solid rgba(52,211,153,0.30); }
+    .strength-med  { background: rgba(251,191,36,0.12);  color: var(--warn);     border: 1px solid rgba(251,191,36,0.30); }
+    .strength-low  { background: rgba(148,163,184,0.10); color: var(--text-dim); border: 1px solid rgba(148,163,184,0.22); }
 
     .tag-wrap { display: flex; flex-wrap: wrap; gap: 5px; }
     .tag {
@@ -221,13 +571,20 @@
 
     #legend {
       position: absolute; bottom: 16px; left: 16px;
-      background: rgba(17,20,32,0.92); border: 1px solid #1e2235;
+      background: rgba(13,16,28,0.72); border: 1px solid rgba(99,102,241,0.18);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02) inset;
       border-radius: 10px; padding: 12px 16px; font-size: 0.72rem;
       pointer-events: none; backdrop-filter: blur(4px); max-width: 180px;
     }
-    #legend h4 { color: #334155; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
-    .legend-row { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; color: #64748b; }
-    .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    #legend h4 { color: #94a3b8; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 10px; }
+    .legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: #cbd5e1; font-size: 0.7rem; }
+    .legend-row:last-child { margin-bottom: 0; }
+    .legend-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+      box-shadow: 0 0 8px currentColor;
+    }
+    .legend-count { color: #475569; font-size: 0.65rem; margin-left: auto; }
 
     #g-loading {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -242,9 +599,12 @@
 
     #tooltip {
       position: fixed; pointer-events: none;
-      background: rgba(17,20,32,0.95); border: 1px solid #2d3148;
-      border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: #e2e8f0;
-      opacity: 0; transition: opacity .12s; max-width: 200px; z-index: 10; line-height: 1.5;
+      background: rgba(13,16,28,0.85);
+      border: 1px solid rgba(99,102,241,0.25);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 6px 24px rgba(0,0,0,0.55);
+      border-radius: 8px; padding: 9px 13px; font-size: 0.76rem; color: #e2e8f0;
+      opacity: 0; transition: opacity .12s; max-width: 220px; z-index: 10; line-height: 1.55;
     }
 
     /* ═══════════════════════════════════════════════════════
@@ -481,15 +841,39 @@
 
     /* ═══ TOPICS VIEW ═══ */
     .tp-search-bar {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 18px; border-bottom: 1px solid #1e2235;
-      background: #0d0f1a; flex-shrink: 0;
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 22px; border-bottom: 1px solid var(--border-faint);
+      background: var(--bg-canvas); flex-shrink: 0;
     }
     .tp-search-bar input {
       flex: 1; background: transparent; border: none; outline: none;
-      font-size: 0.88rem; color: #e2e8f0; font-family: inherit;
+      font-size: 0.95rem; color: var(--text-strong); font-family: inherit;
     }
-    .tp-search-bar input::placeholder { color: #334155; }
+    .tp-search-bar input::placeholder { color: var(--text-faint); }
+    .tp-suggest-row {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 10px 22px;
+      background: var(--bg-surface-1);
+      border-bottom: 1px solid var(--border-faint);
+    }
+    .tp-suggest-label {
+      font-size: 0.72rem; color: var(--text-dim); font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+    .tp-suggest-chip {
+      font-size: 0.72rem; font-family: inherit;
+      padding: 4px 11px; border-radius: var(--radius-pill);
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-soft);
+      color: var(--text-base);
+      cursor: pointer;
+      transition: all .15s var(--ease);
+    }
+    .tp-suggest-chip:hover {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-color: var(--border-strong);
+    }
     .tp-body { display: flex; flex: 1; overflow: hidden; }
     .tp-panel {
       display: flex; flex-direction: column;
@@ -799,55 +1183,122 @@
 <body>
 
 <nav>
-  <span class="nav-brand">SIIP</span>
+  <span class="nav-brand">
+    <span class="brand-mark"></span>
+    SIIP <span class="brand-tag">Curriculum Mapper</span>
+  </span>
   <div class="nav-links">
-    <button class="nav-tab active" id="tab-graph"    onclick="switchView('graph')">Graph</button>
-    <button class="nav-tab"        id="tab-explorer" onclick="switchView('explorer')">Explorer</button>
-    <button class="nav-tab"        id="tab-topics"   onclick="switchView('topics')">Topics</button>
+    <button class="nav-tab active" id="tab-graph"    onclick="switchView('graph')">Map</button>
+    <button class="nav-tab"        id="tab-explorer" onclick="switchView('explorer')">Courses</button>
+    <button class="nav-tab"        id="tab-topics"   onclick="switchView('topics')">Search Topics</button>
   </div>
-  <a class="nav-upload" href="/upload">+ Upload</a>
-  <button id="nav-key-btn" onclick="toggleKeyPanel()" title="Set Gemini API key for explanation generation"
-    style="background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.28); color:#a5b4fc;
-           border-radius:6px; padding:5px 12px; cursor:pointer; font-size:.78rem; white-space:nowrap;">
-    ⚙ API Key
-  </button>
+  <div class="nav-actions">
+    <a class="nav-cta" href="/upload" title="Add a syllabus PDF">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Add syllabus
+    </a>
+    <button class="icon-btn" id="btn-help" onclick="openWelcome()" title="What is this?" aria-label="Help">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.5m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    </button>
+    <button class="icon-btn" id="btn-theme" onclick="toggleTheme()" title="Toggle light / dark" aria-label="Toggle theme">
+      <svg id="icon-theme-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+      <svg id="icon-theme-light" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display:none"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+    </button>
+    <button class="icon-btn" id="btn-settings" onclick="toggleKeyPanel()" title="Settings (Gemini API key)" aria-label="Settings">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    </button>
+  </div>
 </nav>
 
-<!-- API key panel (slides down from nav) -->
-<div id="api-key-panel" style="display:none; background:#1e293b; border-bottom:1px solid rgba(99,102,241,0.25); padding:10px 24px; display:none; align-items:center; gap:12px; font-size:.8rem;">
-  <span style="color:#94a3b8; white-space:nowrap;">Gemini API Key</span>
-  <input id="api-key-input" type="password" placeholder="AIza…  (stored only in your browser)"
-    style="flex:1; background:#0f172a; border:1px solid rgba(99,102,241,0.3); border-radius:6px;
-           color:#e2e8f0; padding:5px 10px; font-size:.8rem; outline:none; max-width:420px;"
-    oninput="saveApiKey(this.value)"/>
-  <button onclick="toggleKeyPanel()"
-    style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3);
-           color:#a5b4fc; border-radius:6px; padding:4px 12px; cursor:pointer; font-size:.78rem;">
-    Done
-  </button>
-  <span style="color:#475569; font-size:.72rem;">Used only when you click "Generate explanation" — never stored on the server.</span>
+<!-- Settings panel (slides down from nav) -->
+<div id="api-key-panel" style="display:none">
+  <div class="settings-row">
+    <div class="settings-label">
+      <strong>Gemini API key</strong>
+      <span>Optional. Only needed to generate fresh AI explanations. Stored in your browser, never on the server.</span>
+    </div>
+    <input id="api-key-input" type="password" placeholder="AIza…"
+      oninput="saveApiKey(this.value)" />
+    <button class="settings-done" onclick="toggleKeyPanel()">Done</button>
+  </div>
+</div>
+
+<!-- ═══ WELCOME OVERLAY ═══ -->
+<div class="welcome-overlay" id="welcome-overlay">
+  <div class="welcome-card">
+    <div class="welcome-eyebrow">UIUC Curriculum Mapper</div>
+    <h1>See how 35 engineering courses connect.</h1>
+    <p class="lede">
+      We measured every pair of UIUC MechSE courses by topic overlap and surfaced
+      <strong style="color:var(--surprise)">surprising cross-domain links</strong> —
+      for example, the spring-mass system in ME&nbsp;340 and the RLC circuit in
+      ECE&nbsp;205 are actually the same second-order ODE in different clothes.
+      Pick a starting point:
+    </p>
+
+    <div class="welcome-actions">
+      <button class="welcome-action" onclick="closeWelcome(); switchView('graph')">
+        <span class="wa-icon">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/></svg>
+        </span>
+        <h3>See the map</h3>
+        <p>Browse the full course similarity graph. Click any node to dive in.</p>
+      </button>
+      <button class="welcome-action" onclick="closeWelcome(); switchView('explorer')">
+        <span class="wa-icon">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        </span>
+        <h3>Pick a course</h3>
+        <p>Look up a specific course and see its most similar — and most surprising — peers.</p>
+      </button>
+      <button class="welcome-action" onclick="closeWelcome(); switchView('topics')">
+        <span class="wa-icon">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </span>
+        <h3>Search a topic</h3>
+        <p>Try "vibration", "Laplace", or "heat transfer" and find every course that touches it.</p>
+      </button>
+    </div>
+
+    <div class="welcome-foot">
+      <span>Built for UIUC MechSE · open-source</span>
+      <button onclick="closeWelcome(true)">Skip intro</button>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ GRAPH VIEW ═══ -->
 <div class="view active" id="view-graph">
   <div class="toolbar">
     <div class="toolbar-group">
-      <label>Min similarity</label>
+      <label for="threshold">Show only stronger connections</label>
       <input type="range" id="threshold" min="0.4" max="0.95" step="0.05" value="0.65" />
       <span class="val-badge" id="threshold-val">0.65</span>
-      <button class="btn btn-ghost" id="btn-reload">Reload</button>
+      <span class="toolbar-help" title="Connections below this similarity score are hidden from the map. Lower = busier, higher = clearer.">?</span>
+      <button class="btn btn-ghost" id="btn-reload" title="Reload the graph from the server">Reload</button>
     </div>
     <div class="toolbar-group">
-      <input type="text" id="path-from" placeholder="From: ME 200" />
-      <input type="text" id="path-to"   placeholder="To: ME 370" />
-      <button class="btn btn-primary" id="btn-path">Find Path</button>
-      <button class="btn btn-ghost"   id="btn-clear-path">Clear</button>
-    </div>
-    <div class="toolbar-group">
-      <label>Mode</label>
-      <button class="btn btn-ghost" id="btn-nonob-mode" onclick="toggleNonObviousMode()" title="Highlight non-obvious cross-domain connections">Non-obvious</button>
+      <button class="btn btn-toggle" id="btn-nonob-mode" onclick="toggleNonObviousMode()"
+              title="Highlight unexpected connections across different engineering domains (e.g. mechanics ↔ electronics)">
+        ✨ Surprises
+      </button>
+      <button class="btn btn-ghost" id="btn-pathfinder-open" onclick="togglePathfinder()" title="Find the shortest similarity path between two courses">
+        Find a path
+      </button>
     </div>
   </div>
+
+  <!-- Pathfinder collapses into the toolbar; hidden by default to reduce noise -->
+  <div class="toolbar pathfinder-row" id="pathfinder-row" style="display:none">
+    <div class="toolbar-group" style="flex:1">
+      <input type="text" id="path-from" placeholder="From course (e.g. ME 200)" list="course-suggestions" />
+      <input type="text" id="path-to"   placeholder="To course (e.g. ME 370)"   list="course-suggestions" />
+      <button class="btn btn-primary" id="btn-path">Show path</button>
+      <button class="btn btn-ghost"   id="btn-clear-path">Clear</button>
+      <button class="btn btn-ghost"   onclick="togglePathfinder()" title="Close path finder" style="margin-left:auto">✕</button>
+    </div>
+  </div>
+  <datalist id="course-suggestions"></datalist>
 
   <div class="graph-main">
     <div id="graph-wrap">
@@ -861,16 +1312,17 @@
 
     <div id="g-panel">
       <div id="g-panel-header">
-        <div id="g-panel-title">Knowledge Graph</div>
-        <div id="g-panel-subtitle">Click a node to explore</div>
+        <div id="g-panel-title">Course map</div>
+        <div id="g-panel-subtitle">Pick a course to dive in</div>
       </div>
       <div id="g-panel-body">
         <div id="g-empty-hint">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
           </svg>
-          <p>Select a course node to see its community, PageRank, top similar courses, and key concepts.</p>
+          <p><strong style="color:var(--text-base)">Click any circle</strong> to see its closest courses, what concepts they share, and which group it belongs to.</p>
+          <p style="margin-top:10px;font-size:.72rem;">Bigger circles = more central to the curriculum.</p>
         </div>
       </div>
     </div>
@@ -894,28 +1346,30 @@
 
     <!-- Middle: details -->
     <div class="ex-panel">
-      <div class="ex-panel-header"><h2>Details</h2></div>
+      <div class="ex-panel-header"><h2>Course details</h2></div>
       <div class="ex-panel-body" id="ex-details-body">
         <div class="ex-empty">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
               d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
           </svg>
-          <p>Select a course to view details</p>
+          <p><strong style="color:var(--text-base)">Pick a course on the left</strong> to see its description, topics, instructor, and tag cloud.</p>
         </div>
       </div>
     </div>
 
     <!-- Right: similar courses -->
     <div class="ex-panel" style="display:flex;flex-direction:column;overflow:hidden;">
-      <div class="ex-panel-header"><h2>Similar Courses</h2></div>
+      <div class="ex-panel-header"><h2>Similar courses</h2></div>
       <div class="ex-controls">
         <label>Show top</label>
         <input type="range" min="1" max="50" value="25" id="ex-topk" />
         <span class="val-badge" id="ex-topk-val">25</span>
-        <div class="ex-sort-toggle">
-          <button class="ex-sort-btn active" id="sort-hybrid" onclick="exSetSort('hybrid')">Hybrid</button>
-          <button class="ex-sort-btn" id="sort-nonobvious" onclick="exSetSort('non_obvious')">Non-obvious</button>
+        <div class="ex-sort-toggle" role="tablist" aria-label="Sort similar courses">
+          <button class="ex-sort-btn active" id="sort-hybrid"     onclick="exSetSort('hybrid')"
+                  title="Sorted by overall similarity (best matches first)">Most similar</button>
+          <button class="ex-sort-btn"        id="sort-nonobvious" onclick="exSetSort('non_obvious')"
+                  title="Sorted by surprise: connections that span different engineering domains">Most surprising</button>
         </div>
       </div>
       <div style="flex:1;overflow-y:auto;" id="ex-similar-body">
@@ -924,7 +1378,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
               d="M13 10V3L4 14h7v7l9-11h-7z"/>
           </svg>
-          <p>Select a course to see similar courses</p>
+          <p>Pick a course to see its closest matches — and which courses unexpectedly overlap with it.</p>
         </div>
       </div>
     </div>
@@ -935,28 +1389,38 @@
 <!-- ═══ TOPICS VIEW ═══ -->
 <div class="view" id="view-topics">
   <div class="tp-search-bar">
-    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0;color:#475569">
+    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0;color:var(--text-dim)">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
     </svg>
-    <input type="text" id="tp-input" placeholder="Search topics — e.g. vibration, Laplace, heat transfer…" autocomplete="off"/>
-    <span id="tp-count" style="font-size:.72rem;color:#334155;white-space:nowrap;"></span>
+    <input type="text" id="tp-input" placeholder="What topic are you curious about? Try 'vibration', 'Laplace', or 'heat transfer'…" autocomplete="off"/>
+    <span id="tp-count" style="font-size:.72rem;color:var(--text-faint);white-space:nowrap;"></span>
+  </div>
+  <div class="tp-suggest-row">
+    <span class="tp-suggest-label">Try:</span>
+    <button class="tp-suggest-chip" onclick="quickSearchTopic('vibration')">vibration</button>
+    <button class="tp-suggest-chip" onclick="quickSearchTopic('Laplace transform')">Laplace transform</button>
+    <button class="tp-suggest-chip" onclick="quickSearchTopic('heat transfer')">heat transfer</button>
+    <button class="tp-suggest-chip" onclick="quickSearchTopic('eigenvalue')">eigenvalue</button>
+    <button class="tp-suggest-chip" onclick="quickSearchTopic('stress')">stress</button>
+    <button class="tp-suggest-chip" onclick="quickSearchTopic('control')">control</button>
   </div>
   <div class="tp-body">
     <!-- Left: topic results -->
     <div class="tp-panel" id="tp-results-panel">
-      <div class="tp-panel-head">Topics</div>
+      <div class="tp-panel-head">Topics that match</div>
       <div class="tp-panel-scroll" id="tp-results">
         <div class="ex-empty" style="padding-top:60px;">
-          <p style="font-size:.8rem;color:#334155;">Type a keyword to search topics</p>
+          <p style="font-size:.85rem;color:var(--text-muted);">Search above to find every course that touches a concept.</p>
+          <p style="font-size:.72rem;color:var(--text-faint);margin-top:6px;">We'll also show courses that <em>don't</em> mention it directly but share underlying ideas — those are usually the most interesting.</p>
         </div>
       </div>
     </div>
     <!-- Right: course matching matrix -->
     <div class="tp-panel" id="tp-matrix-panel">
-      <div class="tp-panel-head">Course Matchings</div>
+      <div class="tp-panel-head">Which courses overlap?</div>
       <div class="tp-panel-scroll" id="tp-matrix">
         <div class="ex-empty" style="padding-top:60px;">
-          <p style="font-size:.8rem;color:#334155;">Matchings appear after a search</p>
+          <p style="font-size:.78rem;color:var(--text-faint);">A pairwise overlap matrix will appear after a search.</p>
         </div>
       </div>
     </div>
@@ -981,9 +1445,11 @@
 <div id="tooltip"></div>
 
 <script>
-const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8080'
-    : window.location.origin;
+const API = (typeof window.__SIIP_API__ === 'string' && window.__SIIP_API__)
+    ? window.__SIIP_API__.replace(/\/+$/, '')
+    : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:8080'
+        : window.location.origin);
 
 /* ═══════════════════════════════════════════════════════
    API KEY MANAGEMENT
@@ -995,26 +1461,83 @@ function getApiKey() {
 }
 function saveApiKey(val) {
   localStorage.setItem('gemini_api_key', val.trim());
-  const btn = document.getElementById('nav-key-btn');
-  if (btn) btn.style.borderColor = val.trim() ? '#6366f1' : 'rgba(99,102,241,0.28)';
+  refreshKeyIndicator();
 }
 function toggleKeyPanel() {
   const panel = document.getElementById('api-key-panel');
   const input = document.getElementById('api-key-input');
   if (!panel) return;
-  const open = panel.style.display === 'flex';
-  panel.style.display = open ? 'none' : 'flex';
+  const open = panel.style.display !== 'none' && panel.style.display !== '';
+  panel.style.display = open ? 'none' : 'block';
   if (!open) {
     input.value = getApiKey();
     input.focus();
   }
 }
-// Restore key indicator on load
+function refreshKeyIndicator() {
+  const btn = document.getElementById('btn-settings');
+  if (btn) btn.style.color = getApiKey() ? 'var(--accent)' : '';
+}
+
+/* ═══════════════════════════════════════════════════════
+   THEME TOGGLE (persisted in localStorage)
+═══════════════════════════════════════════════════════ */
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('icon-theme-dark').style.display  = t === 'light' ? '' : 'none';
+  document.getElementById('icon-theme-light').style.display = t === 'light' ? 'none' : '';
+  // Re-render the graph so D3 picks up the new SVG background gradient context
+  if (typeof graphData !== 'undefined' && graphData.nodes.length) renderGraph();
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const next = cur === 'light' ? 'dark' : 'light';
+  localStorage.setItem('siip_theme', next);
+  applyTheme(next);
+}
+
+/* ═══════════════════════════════════════════════════════
+   WELCOME OVERLAY  (shows once, replayable from help icon)
+═══════════════════════════════════════════════════════ */
+function openWelcome()  { document.getElementById('welcome-overlay')?.classList.add('active'); }
+function closeWelcome(persist) {
+  document.getElementById('welcome-overlay')?.classList.remove('active');
+  if (persist !== false) localStorage.setItem('siip_welcomed', '1');
+}
+
+/* ═══════════════════════════════════════════════════════
+   PATHFINDER TOGGLE
+═══════════════════════════════════════════════════════ */
+function togglePathfinder() {
+  const row = document.getElementById('pathfinder-row');
+  if (!row) return;
+  const open = row.style.display !== 'none';
+  row.style.display = open ? 'none' : 'flex';
+  if (!open) document.getElementById('path-from')?.focus();
+}
+
+/* ═══════════════════════════════════════════════════════
+   COURSE AUTOCOMPLETE (powers the From/To inputs)
+═══════════════════════════════════════════════════════ */
+async function populateCourseSuggestions() {
+  try {
+    const r = await fetch(`${API}/courses`);
+    if (!r.ok) return;
+    const courses = await r.json();
+    const dl = document.getElementById('course-suggestions');
+    if (!dl) return;
+    dl.innerHTML = courses.map(c => `<option value="${c.course_id}">${c.name}</option>`).join('');
+  } catch (_) { /* ignore */ }
+}
+
+// One-time boot
 window.addEventListener('DOMContentLoaded', () => {
-  if (getApiKey()) {
-    const btn = document.getElementById('nav-key-btn');
-    if (btn) btn.style.borderColor = '#6366f1';
-  }
+  // Theme — respect saved choice, default dark
+  applyTheme(localStorage.getItem('siip_theme') || 'dark');
+  refreshKeyIndicator();
+  // Show welcome on first visit
+  if (!localStorage.getItem('siip_welcomed')) openWelcome();
+  populateCourseSuggestions();
 });
 
 /* ═══════════════════════════════════════════════════════
@@ -1034,11 +1557,29 @@ function switchView(view) {
    GRAPH VIEW
 ═══════════════════════════════════════════════════════ */
 const PALETTE = [
-  '#818cf8','#34d399','#f472b6','#fb923c',
-  '#38bdf8','#a78bfa','#facc15','#4ade80',
-  '#f87171','#60a5fa','#fb7185','#2dd4bf',
+  '#a5b4fc',  // indigo
+  '#6ee7b7',  // emerald
+  '#f9a8d4',  // pink
+  '#fdba74',  // orange
+  '#7dd3fc',  // sky
+  '#c4b5fd',  // violet
+  '#fde047',  // yellow
+  '#86efac',  // green
+  '#fca5a5',  // red
+  '#93c5fd',  // blue
+  '#fda4af',  // rose
+  '#5eead4',  // teal
 ];
-const communityColor = id => PALETTE[(id ?? 0) % PALETTE.length];
+const NO_COMMUNITY_COLOR = '#64748b';
+const communityColor = id =>
+  (id == null) ? NO_COMMUNITY_COLOR : PALETTE[id % PALETTE.length];
+
+// Edge colour shifts with score: weak → muted slate-indigo, strong → cyan.
+// In non-obvious mode it shifts to a warm palette so surprises pop visually.
+const edgeColorNormal    = d3.scaleLinear()
+  .domain([0.50, 0.70, 0.90]).range(['#3f4661','#7c84d9','#22d3ee']).clamp(true);
+const edgeColorNonObvious = d3.scaleLinear()
+  .domain([0.00, 0.25, 0.55]).range(['#3f4661','#fb923c','#f97316']).clamp(true);
 
 let graphData       = { nodes: [], edges: [] };
 let simulation      = null;
@@ -1092,6 +1633,7 @@ function renderGraph() {
 
   const edgeScore = d => nonObviousMode && d.non_obvious_score != null
     ? d.non_obvious_score : d.score;
+  const edgeColor = nonObviousMode ? edgeColorNonObvious : edgeColorNormal;
 
   const link = g.append('g').attr('class', 'links')
     .selectAll('line')
@@ -1101,7 +1643,8 @@ function renderGraph() {
         const base = pathEdges.has(edgeKey(d)) ? 'link on-path' : 'link';
         return nonObviousMode ? base + ' nonob-mode' : base;
       })
-      .attr('stroke-width', d => 0.8 + edgeScore(d) * 2.2);
+      .attr('stroke',       d => edgeColor(edgeScore(d)))
+      .attr('stroke-width', d => 0.8 + edgeScore(d) * 2.4);
 
   const node = g.append('g').attr('class', 'nodes')
     .selectAll('g')
@@ -1109,6 +1652,8 @@ function renderGraph() {
     .join('g')
       .attr('class', d =>
         `node${d.id === selectedId ? ' selected' : ''}${pathNodes.has(d.id) ? ' on-path' : ''}`)
+      // currentColor on the group drives drop-shadow glow for circle + text
+      .style('color', d => communityColor(d.community))
       .call(d3.drag()
         .on('start', (e, d) => { if (!e.active) simulation.alphaTarget(0.25).restart(); d.fx = d.x; d.fy = d.y; })
         .on('drag',  (e, d) => { d.fx = e.x; d.fy = e.y; })
@@ -1119,12 +1664,12 @@ function renderGraph() {
       .on('mouseleave', ()     => hideTooltip());
 
   node.append('circle')
-    .attr('r', d => nodeRadius(d, maxPR))
+    .attr('r',    d => nodeRadius(d, maxPR))
     .attr('fill', d => communityColor(d.community));
 
   node.append('text')
     .text(d => d.id)
-    .attr('dy', d => nodeRadius(d, maxPR) + 11);
+    .attr('dy', d => nodeRadius(d, maxPR) + 12);
 
   if (simulation) simulation.stop();
   simulation = d3.forceSimulation(graphData.nodes)
@@ -1184,16 +1729,43 @@ function buildLegend() {
   document.getElementById('legend').innerHTML = `<h4>Communities</h4>` +
     communities.map(c => {
       const count = graphData.nodes.filter(n => (n.community ?? 0) === c).length;
+      const hex   = communityColor(c);
       return `<div class="legend-row">
-        <div class="legend-dot" style="background:${communityColor(c)}"></div>
-        <span>Group ${c} &nbsp;<span style="color:#2d3148">${count}</span></span>
+        <div class="legend-dot" style="background:${hex}; color:${hex}"></div>
+        <span>Group ${c}</span>
+        <span class="legend-count">${count}</span>
       </div>`;
     }).join('');
 }
 
+// Translate a raw similarity (0..1) into a human-friendly tier.
+function scoreTier(s) {
+  if (s == null) return { label: '—', tone: 'low' };
+  if (s >= 0.80) return { label: 'Very strong', tone: 'high' };
+  if (s >= 0.65) return { label: 'Strong',      tone: 'high' };
+  if (s >= 0.50) return { label: 'Moderate',    tone: 'med'  };
+  return { label: 'Light', tone: 'low' };
+}
+// Translate raw PageRank into a relative position label.
+function centralityLabel(pr, allPRs) {
+  if (!pr || !allPRs?.length) return 'Peripheral';
+  const sorted = [...allPRs].sort((a,b) => b-a);
+  const rank   = sorted.indexOf(pr) + 1;
+  const pct    = rank / sorted.length;
+  if (pct <= 0.20) return 'Highly central';
+  if (pct <= 0.50) return 'Well connected';
+  if (pct <= 0.80) return 'Moderately connected';
+  return 'Peripheral';
+}
+
 function showTooltip(e, d) {
-  const tip = document.getElementById('tooltip');
-  tip.innerHTML = `<strong>${d.id}</strong><br>Community ${d.community ?? 0} · PageRank ${(d.pagerank||0).toFixed(4)}`;
+  const tip   = document.getElementById('tooltip');
+  const group = d.community != null ? `Group ${d.community}` : 'Ungrouped';
+  const allPRs = graphData.nodes.map(n => n.pagerank || 0);
+  const central = centralityLabel(d.pagerank, allPRs);
+  tip.innerHTML = `<strong>${d.id}</strong><br>
+    <span style="color:var(--text-muted)">${d.name || ''}</span><br>
+    <span style="color:var(--text-dim);font-size:.7rem">${group} · ${central}</span>`;
   tip.style.opacity = '1';
   moveTooltip(e);
 }
@@ -1224,44 +1796,52 @@ async function selectNode(courseId) {
   const avgScore = neighbors.length
     ? (neighbors.reduce((s, n) => s + n.final_score, 0) / neighbors.length).toFixed(3) : '—';
 
+  const allPRs   = graphData.nodes.map(n => n.pagerank || 0);
+  const groupCol = communityColor(nd?.community);
+
   body.innerHTML = `
     <div class="panel-section">
-      <h3>Overview</h3>
+      <h3>About this course</h3>
       <div class="metric-grid">
-        <div class="metric-box">
-          <div class="metric-label">Community</div>
-          <div class="metric-value" style="color:${communityColor(nd?.community??0)}">${nd?.community ?? '—'}</div>
+        <div class="metric-box" title="Cluster of strongly inter-similar courses">
+          <div class="metric-label">Group</div>
+          <div class="metric-value" style="color:${groupCol}">
+            ${nd?.community != null ? `Group ${nd.community}` : '—'}
+          </div>
         </div>
-        <div class="metric-box">
-          <div class="metric-label">PageRank</div>
-          <div class="metric-value">${(nd?.pagerank||0).toFixed(4)}</div>
+        <div class="metric-box" title="How well-connected this course is to others in the graph">
+          <div class="metric-label">Centrality</div>
+          <div class="metric-value" style="font-size:.92rem">${centralityLabel(nd?.pagerank, allPRs)}</div>
         </div>
-        <div class="metric-box">
+        <div class="metric-box" title="Number of other courses with a meaningful similarity score">
           <div class="metric-label">Connections</div>
           <div class="metric-value">${neighbors.length}</div>
         </div>
-        <div class="metric-box">
-          <div class="metric-label">Avg Score</div>
-          <div class="metric-value">${avgScore}</div>
+        <div class="metric-box" title="Average similarity across all connections">
+          <div class="metric-label">Avg strength</div>
+          <div class="metric-value" style="font-size:.92rem">${scoreTier(+avgScore).label}</div>
         </div>
       </div>
     </div>`;
 
   if (neighbors.length) {
-    const rows = neighbors.map(n => `
-      <div class="g-neighbor-row" onclick="selectNode('${n.course_id}')">
-        <div class="g-neighbor-name">${n.course_id}</div>
-        <div class="score-track"><div class="score-fill" style="width:${n.final_score*100}%"></div></div>
-        <div class="score-num">${(n.final_score*100).toFixed(0)}%</div>
-      </div>`).join('');
-    body.innerHTML += `<div class="panel-section"><h3>Most Similar</h3>${rows}</div>`;
+    const rows = neighbors.map(n => {
+      const tier = scoreTier(n.final_score);
+      return `
+        <div class="g-neighbor-row" onclick="selectNode('${n.course_id}')" title="Similarity score: ${(n.final_score*100).toFixed(0)}%">
+          <div class="g-neighbor-name">${n.course_id}</div>
+          <span class="strength-pill strength-${tier.tone}">${tier.label}</span>
+          <div class="score-track"><div class="score-fill" style="width:${n.final_score*100}%"></div></div>
+        </div>`;
+    }).join('');
+    body.innerHTML += `<div class="panel-section"><h3>Most similar courses</h3>${rows}</div>`;
   }
 
   if (neighbors.length && neighbors[0].driving_terms?.length) {
     const tags = neighbors[0].driving_terms.map(t => `<span class="tag">${t}</span>`).join('');
     body.innerHTML += `
       <div class="panel-section">
-        <h3>Key Concepts vs ${neighbors[0].course_id}</h3>
+        <h3>Shared concepts with ${neighbors[0].course_id}</h3>
         <div class="tag-wrap">${tags}</div>
       </div>`;
   }
@@ -1308,13 +1888,13 @@ async function findPath() {
 
 function clearPath() {
   pathEdges.clear(); pathNodes.clear(); selectedId = null; updateHighlight();
-  document.getElementById('g-panel-title').textContent = 'Knowledge Graph';
-  document.getElementById('g-panel-subtitle').textContent = 'Click a node to explore';
+  document.getElementById('g-panel-title').textContent = 'Course map';
+  document.getElementById('g-panel-subtitle').textContent = 'Pick a course to dive in';
   document.getElementById('g-panel-body').innerHTML = `<div id="g-empty-hint">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
     </svg>
-    <p>Select a course node to see its community, PageRank, top similar courses, and key concepts.</p>
+    <p><strong style="color:var(--text-base)">Click any circle</strong> to see its closest courses and shared concepts.</p>
   </div>`;
 }
 
@@ -1708,7 +2288,7 @@ function exRenderSimilar(sourceCourseId, neighbors) {
         // Nudge user to set their key first
         toggleKeyPanel();
         const lbl = exSortMode === 'non_obvious' ? 'Why non-obvious?' : 'Explore connection';
-        btn.textContent = '⚙ Set API key first ↑';
+        btn.textContent = 'Add your Gemini key first';
         setTimeout(() => { btn.textContent = `✦ ${lbl}`; }, 3000);
         return;
       }
@@ -1847,7 +2427,7 @@ async function openDtModal(sourceCourseId, d) {
 
 async function dtModalGenerate(btn, courseA, courseB, sectionId) {
   const key = getApiKey();
-  if (!key) { toggleKeyPanel(); btn.textContent = '⚙ Set API key first ↑'; return; }
+  if (!key) { toggleKeyPanel(); btn.textContent = 'Add your Gemini key first'; return; }
   btn.disabled = true;
   btn.textContent = '✦ Generating…';
   try {
@@ -1998,15 +2578,26 @@ async function exSaveExpl(courseA, courseB, containerId) {
 ═══════════════════════════════════════════════════════ */
 let tpDebounce = null;
 
+// Lets the suggestion chips type-then-fire for the user.
+function quickSearchTopic(q) {
+  const input = document.getElementById('tp-input');
+  input.value = q;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.focus();
+}
+
 document.getElementById('tp-input').addEventListener('input', e => {
   clearTimeout(tpDebounce);
   const q = e.target.value.trim();
   if (q.length < 2) {
     document.getElementById('tp-count').textContent = '';
     document.getElementById('tp-results').innerHTML =
-      '<div class="ex-empty" style="padding-top:60px;"><p style="font-size:.8rem;color:#334155;">Type a keyword to search topics</p></div>';
+      `<div class="ex-empty" style="padding-top:60px;">
+        <p style="font-size:.85rem;color:var(--text-muted);">Search above to find every course that touches a concept.</p>
+        <p style="font-size:.72rem;color:var(--text-faint);margin-top:6px;">We'll also show courses that <em>don't</em> mention it directly but share underlying ideas.</p>
+      </div>`;
     document.getElementById('tp-matrix').innerHTML =
-      '<div class="ex-empty" style="padding-top:60px;"><p style="font-size:.8rem;color:#334155;">Matchings appear after a search</p></div>';
+      '<div class="ex-empty" style="padding-top:60px;"><p style="font-size:.78rem;color:var(--text-faint);">A pairwise overlap matrix will appear after a search.</p></div>';
     return;
   }
   tpDebounce = setTimeout(() => tpSearch(q), 280);
@@ -2368,7 +2959,7 @@ async function tpExplain(btn) {
   const key = getApiKey();
   if (!key) {
     toggleKeyPanel();
-    btn.textContent = '⚙ Set API key first ↑';
+    btn.textContent = 'Add your Gemini key first';
     setTimeout(() => { btn.textContent = '✦ Explain this connection'; }, 3000);
     return;
   }

@@ -1,0 +1,52 @@
+name: Deploy frontend (Netlify)
+
+# Frontend-only changes redeploy the Netlify site. We inject config.js
+# pointing at the Fly backend URL so the static site knows where the API is.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/**'
+      - 'netlify.toml'
+      - '.github/workflows/deploy-netlify.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-netlify
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: netlify deploy --prod
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID:    ${{ secrets.NETLIFY_SITE_ID }}
+      SIIP_API_URL:       ${{ secrets.SIIP_API_URL }}    # https://siip-armchair-akhil.fly.dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Netlify CLI
+        run: npm install -g netlify-cli@17
+
+      - name: Build deploy artifact
+        run: |
+          set -e
+          DIST="$RUNNER_TEMP/siip-dist"
+          rm -rf "$DIST" && mkdir -p "$DIST"
+          cp -R public/* "$DIST/"
+          cp netlify.toml "$DIST/netlify.toml" 2>/dev/null || true
+          : "${SIIP_API_URL:?SIIP_API_URL secret is required}"
+          cat > "$DIST/config.js" <<EOF
+          // Generated at deploy time by .github/workflows/deploy-netlify.yml
+          window.__SIIP_API__ = "${SIIP_API_URL%/}";
+          EOF
+          echo "DIST_DIR=$DIST" >> "$GITHUB_ENV"
+
+      - name: Deploy to Netlify (prod)
+        run: netlify deploy --prod --dir "$DIST_DIR" --site "$NETLIFY_SITE_ID" --message "ci: $(git rev-parse --short HEAD)"

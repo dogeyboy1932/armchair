@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from storage import postgres_store as pg_store
-from storage import milvus_store as milvus
+from storage import vector_store as milvus
 
 
 

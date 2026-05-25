@@ -14,8 +14,8 @@ _FORMAT_RULES = (
     "Rules:\n"
     "- SPECIFICITY IS MANDATORY. Every 'connection' field must name the exact shared "
     "concept so precisely that it could only describe THIS pair of courses — not any "
-    "two random technical courses. Ask yourself: 'Could "iterative approximation" or "
-    '"both use math" describe a thousand other pairs?' If yes, you are being too vague.\n'
+    "two random technical courses. Ask yourself: 'Could \"iterative approximation\" or "
+    "\"both use math\" describe a thousand other pairs?' If yes, you are being too vague.\n"
     "- Name actual equations, theorems, or algorithms: e.g. '2nd-order ODE "
     "mẍ+cẋ+kx=F ↔ Lq̈+Rq̇+q/C=V', or 'Markov chain convergence via eigenvalue analysis', "
     "or 'gradient descent minimizing a convex loss function'. Generic phrases like "

@@ -1,0 +1,55 @@
+name: Deploy backend (Fly.io)
+
+# Pushes to main rebuild the Fly image and roll out. Public/ is included
+# because index.html is also served by the FastAPI app at the Fly URL.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - 'scoring/**'
+      - 'pipeline/**'
+      - 'storage/**'
+      - 'scripts/**'
+      - 'data/**'
+      - 'public/**'
+      - 'config.py'
+      - 'Dockerfile.api'
+      - 'requirements-api.txt'
+      - 'fly.toml'
+      - '.github/workflows/deploy-fly.yml'
+  workflow_dispatch:        # manual "Run workflow" button on GitHub
+
+concurrency:
+  group: deploy-fly
+  cancel-in-progress: false  # don't kill an in-flight deploy mid-roll
+
+jobs:
+  deploy:
+    name: flyctl deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Fly
+        run: flyctl deploy --remote-only --wait-timeout 600
+
+      - name: Smoke-test /health
+        run: |
+          set -e
+          APP_URL="https://siip-armchair-akhil.fly.dev"
+          for i in {1..18}; do
+            if curl -sf "$APP_URL/health" >/dev/null; then
+              echo "✓ Backend healthy at $APP_URL"
+              exit 0
+            fi
+            echo "Waiting for health… ($i/18)"
+            sleep 10
+          done
+          echo "✗ /health never returned 200" >&2
+          exit 1

@@ -1,0 +1,30 @@
+# Production runtime deps for the SIIP backend on Fly.io.
+# Matches local capabilities: PDF ingest, SciNCL embedding, topic/category LLM
+# pipelines, scoring, graph build. Use pgvector instead of Milvus.
+
+# Storage
+psycopg2-binary>=2.9
+neo4j>=5.14,<6.0
+
+# ML / Embeddings  (PyTorch CPU wheel installed separately in Dockerfile)
+sentence-transformers>=2.3,<3.0
+transformers>=4.36,<5.0
+
+# PDF parsing
+pdfplumber>=0.10
+
+# Web
+fastapi>=0.109
+uvicorn[standard]>=0.27
+python-multipart>=0.0.7
+aiofiles>=23.0
+
+# Utils
+numpy<2.0,>=1.24
+scipy>=1.11
+nltk>=3.8
+tqdm>=4.66
+python-dotenv>=1.0
+
+# LLM (Gemini for topic extraction, category labeling, explanations)
+google-genai>=1.0

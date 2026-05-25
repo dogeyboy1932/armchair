@@ -1,15 +1,9 @@
 [build]
   publish = "public"
 
+# SPA routing fallback: static files (upload.html, config.js, …) are served
+# directly when they exist; unknown paths fall back to index.html.
 [[redirects]]
-  # Redirect API requests if we ever want to proxy them (optional, placeholders)
-  # from = "/api/*"
-  # to = "https://your-backend-url.com/:splat"
-  # status = 200
-  # force = true
-
-[[redirects]]
-  # SPA routing fallback (if applicable, though this is a single SPA index.html)
   from = "/*"
   to = "/index.html"
   status = 200

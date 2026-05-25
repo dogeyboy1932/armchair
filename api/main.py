@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 import storage.postgres_store as pg_store
 import storage.neo4j_store    as neo4j
-from storage.milvus_store import get_or_create_collection
+from storage import vector_store as vs
 from api.routes import courses, similarity, graph, ingest, topics
 
 PUBLIC_DIR = Path(__file__).parent.parent / "public"
@@ -17,7 +17,7 @@ PUBLIC_DIR = Path(__file__).parent.parent / "public"
 async def lifespan(app: FastAPI):
     pg_store.init_schema()
     neo4j.init_schema()
-    get_or_create_collection()
+    vs.get_or_create_collection()
     yield
 
 

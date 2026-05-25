@@ -11,7 +11,7 @@ _pool: Optional[psycopg2.pool.ThreadedConnectionPool] = None
 def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     global _pool
     if _pool is None:
-        _pool = psycopg2.pool.ThreadedConnectionPool(
+        kwargs = dict(
             minconn=1, maxconn=10,
             host=config.POSTGRES_HOST,
             port=config.POSTGRES_PORT,
@@ -19,6 +19,9 @@ def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
             user=config.POSTGRES_USER,
             password=config.POSTGRES_PASSWORD,
         )
+        if getattr(config, 'POSTGRES_SSLMODE', None):
+            kwargs['sslmode'] = config.POSTGRES_SSLMODE
+        _pool = psycopg2.pool.ThreadedConnectionPool(**kwargs)
     return _pool
 
 

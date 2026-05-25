@@ -1,0 +1,42 @@
+# Fly.io deploy config for the SIIP backend.
+# Frontend is served from Netlify (see deploy/free/03-deploy-netlify.sh).
+# Databases live in Supabase (pgvector) + Neo4j Aura, set as secrets:
+#   fly secrets set DATABASE_URL=... NEO4J_URI=... NEO4J_USER=... NEO4J_PASSWORD=...
+
+app = "siip-armchair-akhil"
+primary_region = "ord"  # Chicago — close to UIUC
+
+[build]
+  dockerfile = "Dockerfile.api"
+
+[env]
+  VECTOR_BACKEND   = "pgvector"
+  POSTGRES_SSLMODE = "require"
+  # NEO4J_USER is set via `flyctl secrets set` (Aura instance-specific)
+
+[http_service]
+  internal_port      = 8080
+  force_https        = true
+  # Keep one machine alive 24/7 so background ingest tasks (PDF upload =>
+  # SciNCL embed => score) always have a host. Cost: ~$3.89/mo on a 2 GB
+  # shared-cpu-1x, covered by Fly's $5/mo hobby credit.
+  auto_stop_machines   = "off"
+  auto_start_machines  = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type       = "requests"
+    soft_limit = 10
+    hard_limit = 20
+
+# /health is fast; allow 60s grace for the SciNCL model to warm up on boot.
+[[http_service.checks]]
+  interval      = "30s"
+  timeout       = "5s"
+  grace_period  = "60s"
+  method        = "GET"
+  path          = "/health"
+
+[[vm]]
+  size   = "shared-cpu-1x"
+  memory = "2gb"            # SciNCL needs ~1.5 GB resident

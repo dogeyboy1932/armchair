@@ -1,17 +1,42 @@
 import os
 from pathlib import Path
+from urllib.parse import urlparse, unquote
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / '.env')
 
-# PostgreSQL
-POSTGRES_HOST     = os.environ.get('POSTGRES_HOST', 'localhost')
-POSTGRES_PORT     = int(os.environ.get('POSTGRES_PORT', 5432))
-POSTGRES_DB       = os.environ.get('POSTGRES_DB', 'siip')
-POSTGRES_USER     = os.environ.get('POSTGRES_USER', 'siip')
-POSTGRES_PASSWORD = os.environ.get('POSTGRES_PASSWORD', '')
 
-# Milvus
+def _parse_database_url(url: str) -> dict | None:
+    """Parse a postgres:// connection URL into individual fields."""
+    if not url:
+        return None
+    p = urlparse(url)
+    if p.scheme not in ('postgres', 'postgresql'):
+        return None
+    return {
+        'host':     p.hostname or 'localhost',
+        'port':     p.port or 5432,
+        'db':       (p.path or '/').lstrip('/') or 'postgres',
+        'user':     unquote(p.username) if p.username else '',
+        'password': unquote(p.password) if p.password else '',
+        'sslmode':  'require' if 'sslmode=require' in (p.query or '') else None,
+    }
+
+
+_pg_url = _parse_database_url(os.environ.get('DATABASE_URL', ''))
+
+# PostgreSQL (DATABASE_URL takes priority over individual vars)
+POSTGRES_HOST     = (_pg_url or {}).get('host')     or os.environ.get('POSTGRES_HOST', 'localhost')
+POSTGRES_PORT     = (_pg_url or {}).get('port')     or int(os.environ.get('POSTGRES_PORT', 5432))
+POSTGRES_DB       = (_pg_url or {}).get('db')       or os.environ.get('POSTGRES_DB', 'siip')
+POSTGRES_USER     = (_pg_url or {}).get('user')     or os.environ.get('POSTGRES_USER', 'siip')
+POSTGRES_PASSWORD = (_pg_url or {}).get('password') or os.environ.get('POSTGRES_PASSWORD', '')
+POSTGRES_SSLMODE  = (_pg_url or {}).get('sslmode')  or os.environ.get('POSTGRES_SSLMODE')
+
+# Vector backend: 'milvus' (local docker stack) or 'pgvector' (managed Postgres)
+VECTOR_BACKEND = os.environ.get('VECTOR_BACKEND', 'milvus').lower().strip()
+
+# Milvus (only used when VECTOR_BACKEND=milvus)
 MILVUS_HOST = os.environ.get('MILVUS_HOST', 'localhost')
 MILVUS_PORT = int(os.environ.get('MILVUS_PORT', 19530))
 
