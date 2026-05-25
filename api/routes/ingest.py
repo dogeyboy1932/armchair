@@ -11,7 +11,7 @@ from scoring.driving_terms     import compute_idf
 from scoring.hybrid_scorer     import score_pair
 from scoring.language_model    import build_all_lms
 from scoring.category_scorer   import course_category_vector
-from storage import vector_store  as milvus
+from storage import vector_store as vs
 from storage import neo4j_store   as neo4j
 from storage import postgres_store as pg_store
 
@@ -34,6 +34,12 @@ except ImportError as _e:
     )
 
 router = APIRouter()
+
+
+def _rebuild_topic_graph(course_id: str):
+    """Refresh topic_similarity rows for a course (Topics tab cross-course hits)."""
+    from scripts.build_topic_graph import build_for_courses
+    build_for_courses([course_id], top_k=10, min_score=0.70)
 
 
 def _require_ingest():
@@ -94,11 +100,13 @@ def _run_ingest(course_id: str, course_name: str, raw_text: str, api_key: str | 
             cur = conn.cursor()
             for tbl, col in [('similarity_cache','course_a'),('similarity_cache','course_b'),
                               ('topic_similarity','course_a'),('topic_similarity','course_b'),
-                              ('topic_categories','course_id'),('term_counts','course_id')]:
+                              ('topic_categories','course_id'),('term_counts','course_id'),
+                              ('chunks','course_id')]:
                 cur.execute(f"DELETE FROM {tbl} WHERE {col}=%s", (course_id,))
             cur.execute("DELETE FROM courses WHERE course_id=%s", (course_id,))
             conn.commit(); cur.close(); conn.close()
-            milvus.delete_course(course_id)
+            vs.delete_course(course_id)
+            neo4j.delete_course(course_id)
         except Exception as cleanup_err:
             print(f"[ingest] cleanup error: {cleanup_err}")
 
@@ -144,12 +152,12 @@ def _run_ingest_inner(course_id: str, course_name: str, raw_text: str, api_key: 
     embed_chunks = [c for c in chunks if c['chunk_type'] in ('topic', 'definition')]
     if embed_chunks:
         embeddings = encode([c['raw_text'] for c in embed_chunks])
-        milvus.insert_chunks([
+        vs.insert_chunks([
             {'chunk_id': embed_chunks[i]['chunk_id'], 'course_id': course_id,
              'embedding': embeddings[i]}
             for i in range(len(embed_chunks))
         ])
-    print(f"[ingest]   ✓ {len(chunks)} chunks stored, {len(embed_chunks)} embedded in Milvus")
+    print(f"[ingest]   ✓ {len(chunks)} chunks stored, {len(embed_chunks)} embedded ({vs.BACKEND_NAME})")
 
     # ── Step 3: Store category distributions + tags (from step 1, no extra LLM call) ──
     for t in topics:
@@ -179,8 +187,16 @@ def _run_ingest_inner(course_id: str, course_name: str, raw_text: str, api_key: 
             pair_count += 1
     print(f"[ingest]   ✓ {pair_count} pairs scored (hybrid + non_obvious)")
 
-    # ── Step 6: Stack — Neo4j community detection ────────────────────────────────
-    print(f"[ingest] Step 6/6 — Updating Neo4j community clusters …")
+    # ── Step 6: Topic-level ANN graph (Postgres topic_similarity + vector store) ─
+    print(f"[ingest] Step 6/7 — Topic-to-topic similarity graph …")
+    try:
+        _rebuild_topic_graph(course_id)
+        print(f"[ingest]   ✓ topic_similarity updated")
+    except Exception as e:
+        print(f"[ingest]   ⚠ Topic graph rebuild failed: {e}")
+
+    # ── Step 7: Neo4j community detection (reclusters ALL courses from edge weights) ─
+    print(f"[ingest] Step 7/7 — Updating Neo4j community clusters …")
     try:
         neo4j.run_community_detection()
         print(f"[ingest]   ✓ Community detection complete")
@@ -230,11 +246,12 @@ async def ingest_pdf(
         "message":    f"Ingestion started for '{course_name}'.",
         "course_id":  course_id,
         "steps":      [
-            "1. LLM: topic extraction from PDF text",
-            "2. LLM: 8-category distribution labeling per topic",
-            "3. Stack: chunking + SciNCL embedding (Milvus) + term counts (PostgreSQL)",
-            "4-5. Math: hybrid scoring + non_obvious_score for all pairs",
-            "6. Stack: Neo4j community detection",
+            "1. LLM: topic extraction + category labeling (Gemini)",
+            "2. Postgres: course, chunks, term_counts, topic_categories",
+            f"3. Vectors: SciNCL embed → {vs.BACKEND_NAME}",
+            "4. Postgres + Neo4j: hybrid scoring for all course pairs",
+            "5. Postgres: topic-to-topic similarity (topic_similarity)",
+            "6. Neo4j: Louvain communities + PageRank (full graph recluster)",
         ],
         "note": "Scores and category data ready in ~60 s. Explanations generated on-demand via the UI.",
     }
@@ -307,12 +324,12 @@ def _run_append_inner(course_id: str, course_name: str, raw_text: str, api_key: 
     embed_chunks = [c for c in chunks if c['chunk_type'] in ('topic', 'definition')]
     if embed_chunks:
         embeddings = encode([c['raw_text'] for c in embed_chunks])
-        milvus.insert_chunks([
+        vs.insert_chunks([
             {'chunk_id': embed_chunks[i]['chunk_id'], 'course_id': course_id,
              'embedding': embeddings[i]}
             for i in range(len(embed_chunks))
         ])
-    print(f"[append]   ✓ {len(chunks)} new chunks stored, {len(embed_chunks)} embedded in Milvus")
+    print(f"[append]   ✓ {len(chunks)} new chunks stored, {len(embed_chunks)} embedded ({vs.BACKEND_NAME})")
 
     # ── Steps 4: Math — recompute all similarity scores for this course ────────────
     print(f"[append] Step 4/5 — Recomputing similarity scores …")
@@ -336,8 +353,16 @@ def _run_append_inner(course_id: str, course_name: str, raw_text: str, api_key: 
             pair_count += 1
     print(f"[append]   ✓ {pair_count} pairs rescored")
 
-    # ── Step 5: Stack — Neo4j community detection ──────────────────────────────────
-    print(f"[append] Step 5/5 — Updating Neo4j community clusters …")
+    # ── Step 5: Topic-level ANN graph ───────────────────────────────────────────
+    print(f"[append] Step 5/6 — Rebuilding topic-to-topic pairs …")
+    try:
+        _rebuild_topic_graph(course_id)
+        print(f"[append]   ✓ topic_similarity updated")
+    except Exception as e:
+        print(f"[append]   ⚠ Topic graph rebuild failed: {e}")
+
+    # ── Step 6: Neo4j community detection ────────────────────────────────────────
+    print(f"[append] Step 6/6 — Updating Neo4j community clusters …")
     try:
         neo4j.run_community_detection()
         print(f"[append]   ✓ Community detection complete")

@@ -238,6 +238,12 @@ def get_full_graph(min_score: float = 0.4) -> dict:
     return {"nodes": nodes, "edges": edges}
 
 
+def delete_course(course_id: str):
+    """Remove a course node and all its SIMILAR_TO edges."""
+    with _get_driver().session() as s:
+        s.run("MATCH (c:Course {id: $id}) DETACH DELETE c", id=course_id)
+
+
 def clear():
     with _get_driver().session() as s:
         s.run("MATCH (n) DETACH DELETE n")
