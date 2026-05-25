@@ -1,28 +1,17 @@
-name: Deploy backend (Fly.io)
+name: Deploy to Fly.io
 
-# Pushes to main rebuild the Fly image and roll out. Public/ is included
-# because index.html is also served by the FastAPI app at the Fly URL.
+# Every push to main redeploys production (API + UI + SciNCL image).
+# Code/style changes go live automatically. Cloud databases (Supabase, Aura)
+# are unchanged — data only shifts when you upload on the live site or run
+# maintenance scripts against the shared cloud DBs.
 on:
   push:
     branches: [main]
-    paths:
-      - 'api/**'
-      - 'scoring/**'
-      - 'pipeline/**'
-      - 'storage/**'
-      - 'scripts/**'
-      - 'data/**'
-      - 'public/**'
-      - 'config.py'
-      - 'Dockerfile.api'
-      - 'requirements-api.txt'
-      - 'fly.toml'
-      - '.github/workflows/deploy-fly.yml'
-  workflow_dispatch:        # manual "Run workflow" button on GitHub
+  workflow_dispatch:
 
 concurrency:
   group: deploy-fly
-  cancel-in-progress: false  # don't kill an in-flight deploy mid-roll
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -45,7 +34,7 @@ jobs:
           APP_URL="https://siip-armchair-akhil.fly.dev"
           for i in {1..18}; do
             if curl -sf "$APP_URL/health" >/dev/null; then
-              echo "✓ Backend healthy at $APP_URL"
+              echo "✓ Production healthy at $APP_URL"
               exit 0
             fi
             echo "Waiting for health… ($i/18)"

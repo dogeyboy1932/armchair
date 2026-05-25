@@ -6,13 +6,20 @@ A locally-runnable semantic similarity engine for 33 UIUC MechSE courses.
 Goal: surface **non-obvious cross-domain connections** between course topics
 (e.g., ME340 spring-mass system ↔ ECE210 RLC circuit — same 2nd-order ODE, different domains).
 
-### Quick Start
+### Quick Start (cloud-backed — same DBs as production)
 ```bash
-docker-compose up -d          # start PostgreSQL, Milvus, Neo4j
-python scripts/seed.py         # load 33 courses from data/mechse_syllabi.json
-python scripts/label_categories.py  # LLM: assign category distributions to topics (~$0.10)
-python scripts/build_graph.py  # compute all 528 pairs + non_obvious_score
-python scripts/explain_connections.py --top 50  # LLM: explain top non-obvious pairs (~$0.50)
+cp deploy/free/credentials.env.example deploy/free/credentials.env
+# fill DATABASE_URL, NEO4J_URI, NEO4J_PASSWORD
+bash deploy/free/link-local-env.sh
+uvicorn api.main:app --host 0.0.0.0 --port 8080 --reload
+# ship changes: git push origin main  →  GitHub Actions deploys Fly
+```
+
+### Optional isolated local stack (Docker + Milvus)
+```bash
+docker-compose up -d
+python scripts/seed.py
+python scripts/build_graph.py
 uvicorn api.main:app --port 8080 --reload
 ```
 
@@ -58,13 +65,11 @@ POST /ingest/pdf                          → upload new syllabus PDF
 - `data/instructors.json` — course → instructor mappings
 
 ### Environment (.env)
+Cloud-backed local dev (recommended — same Supabase + Aura as production):
+```bash
+bash deploy/free/link-local-env.sh   # writes .env from deploy/free/credentials.env
 ```
-POSTGRES_HOST=localhost  POSTGRES_PORT=5433  POSTGRES_DB=siip
-MILVUS_HOST=localhost    MILVUS_PORT=19530
-NEO4J_URI=bolt://localhost:7687
-GEMINI_API_KEY=...       (required for label_categories.py + explain_connections.py)
-ALPHA=0.4                DIRICHLET_MU=2000  MIN_SCORE=0.55
-```
+Or isolated Docker stack: `POSTGRES_HOST=localhost`, `MILVUS_HOST=localhost`, `NEO4J_URI=bolt://localhost:7687`, `VECTOR_BACKEND=milvus`
 
 ### Research Context
 - Supervisor: Eliot Bethke (bethke2@illinois.edu)

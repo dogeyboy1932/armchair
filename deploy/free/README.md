@@ -1,9 +1,46 @@
 # SIIP production deploy: Supabase + Neo4j Aura + Fly.io
 
-Production is a **true clone of local** — same features, same maintenance ops, same
-scripts. The only difference is where the boxes run. No "compute locally and
-push": everything (SciNCL embedding, PDF ingest, topic graph builds, category
-labeling) happens on Fly.
+## How local and production relate
+
+**One set of cloud databases. Two places the code runs.**
+
+| | Local (`uvicorn --reload`) | Production (`siip-armchair-akhil.fly.dev`) |
+|---|---|---|
+| **Code / UI** | Your working copy | Deployed Docker image on Fly |
+| **Postgres + pgvector** | Supabase (shared) | Supabase (same) |
+| **Neo4j graph** | Aura (shared) | Aura (same) |
+| **SciNCL / scripts** | Your laptop (optional) | Fly machine (always on) |
+
+```bash
+# 1. One-time: fill cloud credentials
+cp deploy/free/credentials.env.example deploy/free/credentials.env
+
+# 2. Point local .env at the same Supabase + Aura as production
+bash deploy/free/link-local-env.sh
+
+# 3. Develop locally against live data
+uvicorn api.main:app --host 0.0.0.0 --port 8080 --reload
+
+# 4. Ship code/UI changes — one push deploys Fly
+git push origin main
+```
+
+**What syncs automatically:** anything in git (Python, HTML, CSS, scoring weights in
+`config.py`, seed JSON in `data/`). GitHub Actions rebuilds and rolls out Fly on
+every push to `main`.
+
+**What does NOT sync via git:** data you create only on the live site (e.g. PDF
+upload on production). That goes straight into the shared cloud DBs — your local
+`uvicorn` will see it too once you refresh, because it's the same Supabase/Aura.
+
+**Optional:** `docker-compose` still works as a fully isolated offline stack. It is
+not the primary dev path when using cloud-backed `.env`.
+
+---
+
+Production is a **true clone of local** in features and maintenance scripts.
+Heavy ops (SciNCL embed, PDF ingest, graph builds) can run on Fly via
+`flyctl ssh console` so your laptop doesn't need the model loaded.
 
 ```
 ┌──────────────────────────────────────────────────────────┐

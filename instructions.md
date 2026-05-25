@@ -1,5 +1,20 @@
 # SIIP Semantic Pipeline — Setup & Run Instructions
 
+> **Production workflow (recommended):** Local and production share the same
+> Supabase + Neo4j Aura databases. Only code/UI differ until you `git push`.
+> See `deploy/free/README.md` for the full picture.
+>
+> ```bash
+> cp deploy/free/credentials.env.example deploy/free/credentials.env
+> # fill DATABASE_URL, NEO4J_URI, NEO4J_PASSWORD
+> bash deploy/free/link-local-env.sh
+> uvicorn api.main:app --host 0.0.0.0 --port 8080 --reload
+> git push origin main   # → GitHub Actions deploys https://siip-armchair-akhil.fly.dev
+> ```
+>
+> The sections below describe an **optional isolated Docker stack** for fully
+> offline development. Skip them if you use the cloud-backed `.env` above.
+
 ## What You Already Have (Verified)
 - Docker 28.5.1 ✓
 - Docker Compose v2.40.1 ✓
