@@ -2,13 +2,17 @@
 .venv/
 .model_cache/
 
-# Oracle deploy secrets and state
-deploy/oci/credentials.env
-deploy/oci/state/
-deploy/oci/.venv/
+# Oracle deploy secrets and state (legacy path)
+deploy/legacy/oci/credentials.env
+deploy/legacy/oci/state/
+deploy/legacy/oci/.venv/
 
 # Free-tier deploy secrets
 deploy/free/credentials.env
+
+# Aura credential backups downloaded from the Neo4j console
+deploy/Neo4j-*.txt
+deploy/legacy/Neo4j-*.txt
 
 __pycache__/
 *.pyc

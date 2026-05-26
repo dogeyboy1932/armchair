@@ -11,7 +11,7 @@ the internet to a managed pgvector. This version:
 For 33 courses × ~50 chunks each that's 33 SELECTs total + pure CPU after.
 """
 import numpy as np
-from storage.vector_store import get_embeddings_for_course
+from storage.vectors.store import get_embeddings_for_course
 
 _cache: dict[str, np.ndarray | None] = {}
 

@@ -11,11 +11,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from tqdm import tqdm
 import config
-from pipeline.chunker  import chunk_course
-from pipeline.encoder  import encode
-from storage import postgres_store as pg_store
-from storage import vector_store   as milvus
-from storage import neo4j_store    as neo4j
+from scoring.chunker  import chunk_course
+from storage.vectors.encoder  import encode
+from storage.postgres import store as pg_store
+from storage.vectors import store as milvus
+from storage.neo4j import store as neo4j
 
 
 def main():

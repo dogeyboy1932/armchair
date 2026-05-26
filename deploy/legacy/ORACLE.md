@@ -1,8 +1,17 @@
-# Deploy SIIP on Oracle Cloud (Free)
+# Deploy SIIP on Oracle Cloud (Free) — LEGACY
+
+> **Production runs on Supabase + Neo4j Aura + Fly.io** — see `deploy/free/README.md`.
+> This Oracle path was abandoned after persistent "Out of host capacity" errors on
+> Always Free ARM instances. Kept in `deploy/legacy/` for self-hosting on any
+> Ubuntu VPS or if Oracle capacity opens up.
 
 **Repo:** https://github.com/dogeyboy1932/armchair  
 **Cost:** $0/month (Oracle Always Free tier)  
 **Time:** ~20 minutes hands-on + ~20 minutes automated setup
+
+Two paths:
+- **§ Web console (manual)** — point-and-click in cloud.oracle.com. Best the first time.
+- **§ CLI-driven (`deploy/legacy/oci/`)** — fully automated from credentials → live URL. Best for re-deploys.
 
 ---
 
@@ -113,7 +122,7 @@ Default username is **`ubuntu`**.
 Paste this single command on the server:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dogeyboy1932/armchair/main/deploy/oracle-install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dogeyboy1932/armchair/main/deploy/legacy/oracle-install.sh | bash
 ```
 
 That's it. Go get coffee — first run takes **20–40 minutes** (Docker images + SciNCL model download + data seeding).
@@ -121,7 +130,7 @@ That's it. Go get coffee — first run takes **20–40 minutes** (Docker images 
 #### Optional: include Gemini API key for pre-generated explanations
 
 ```bash
-GEMINI_API_KEY=your-key-here curl -fsSL https://raw.githubusercontent.com/dogeyboy1932/armchair/main/deploy/oracle-install.sh | bash
+GEMINI_API_KEY=your-key-here curl -fsSL https://raw.githubusercontent.com/dogeyboy1932/armchair/main/deploy/legacy/oracle-install.sh | bash
 ```
 
 Without this, the app still works — users paste their own key via the **⚙ API Key** button in the UI.
@@ -162,7 +171,7 @@ In a browser:
 
 ```bash
 cd ~/armchair
-SIIP_DOMAIN=armchair.yourdomain.com ./deploy/bootstrap.sh
+SIIP_DOMAIN=armchair.yourdomain.com ./deploy/legacy/bootstrap.sh
 ```
 
 Caddy is installed automatically and provisions a free TLS certificate.
@@ -175,7 +184,7 @@ All commands run on the server from `~/armchair`:
 
 ```bash
 cd ~/armchair
-COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+COMPOSE="docker compose -f deploy/legacy/docker-compose.yml -f deploy/legacy/docker-compose.prod.yml"
 
 # Check all containers
 $COMPOSE ps
@@ -188,7 +197,7 @@ git pull origin main
 $COMPOSE up -d --build
 
 # Re-run bootstrap (safe — skips seed if data exists)
-./deploy/bootstrap.sh
+./deploy/legacy/bootstrap.sh
 
 # Stop everything (VM still runs, app is down)
 $COMPOSE down
@@ -256,7 +265,7 @@ If the review page shows **Public IPv4 address: No**, you cannot SSH from home o
 
 ```bash
 cd ~/armchair
-sudo ./deploy/bootstrap.sh
+sudo ./deploy/legacy/bootstrap.sh
 ```
 
 ### Page won't load in browser but health check works on server
@@ -269,8 +278,8 @@ Milvus is slow on first boot. Wait 5 minutes, then:
 
 ```bash
 cd ~/armchair
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs milvus
-docker compose -f docker-compose.yml -f docker-compose.prod.yml restart backend
+docker compose -f deploy/legacy/docker-compose.yml -f deploy/legacy/docker-compose.prod.yml logs milvus
+docker compose -f deploy/legacy/docker-compose.yml -f deploy/legacy/docker-compose.prod.yml restart backend
 ```
 
 ### Out of memory during seed
@@ -280,8 +289,8 @@ The script adds 4 GB swap automatically on machines with < 12 GB RAM. If seed st
 ```bash
 free -h   # confirm swap is active
 cd ~/armchair
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec backend python scripts/seed.py
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec backend python scripts/build_graph.py
+docker compose -f deploy/legacy/docker-compose.yml -f deploy/legacy/docker-compose.prod.yml exec backend python scripts/seed.py
+docker compose -f deploy/legacy/docker-compose.yml -f deploy/legacy/docker-compose.prod.yml exec backend python scripts/build_graph.py
 ```
 
 ### UI loads but API calls fail
@@ -289,7 +298,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml exec backend pyt
 Make sure you're on the latest code (API URL fix):
 
 ```bash
-cd ~/armchair && git pull origin main && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+cd ~/armchair && git pull origin main && docker compose -f deploy/legacy/docker-compose.yml -f deploy/legacy/docker-compose.prod.yml up -d --build
 ```
 
 ### Re-install from scratch
@@ -297,14 +306,14 @@ cd ~/armchair && git pull origin main && docker compose -f docker-compose.yml -f
 ```bash
 cd ~
 rm -rf armchair
-curl -fsSL https://raw.githubusercontent.com/dogeyboy1932/armchair/main/deploy/oracle-install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dogeyboy1932/armchair/main/deploy/legacy/oracle-install.sh | bash
 ```
 
 Database volumes are removed with the repo folder only if you also run:
 
 ```bash
 docker volume ls | grep siip   # list volumes
-docker compose -f ~/armchair/docker-compose.yml down -v   # ⚠ deletes all data
+docker compose -f ~/armchair/deploy/legacy/docker-compose.yml down -v   # ⚠ deletes all data
 ```
 
 ---
@@ -327,7 +336,7 @@ docker compose -f ~/armchair/docker-compose.yml down -v   # ⚠ deletes all data
 ```
 Oracle console:  https://cloud.oracle.com
 Repo:            https://github.com/dogeyboy1932/armchair
-Install command: curl -fsSL https://raw.githubusercontent.com/dogeyboy1932/armchair/main/deploy/oracle-install.sh | bash
+Install command: curl -fsSL https://raw.githubusercontent.com/dogeyboy1932/armchair/main/deploy/legacy/oracle-install.sh | bash
 App URL:         http://YOUR_ORACLE_IP:8080
 Health check:    http://YOUR_ORACLE_IP:8080/health
 ```
@@ -354,3 +363,68 @@ Ubuntu VM
 ```
 
 Frontend and backend are served together — no separate Netlify or CDN needed.
+
+---
+
+## CLI-driven path (`deploy/legacy/oci/`)
+
+For automated re-deploys: from "I have Oracle credentials" to "live URL" without
+touching the web console.
+
+### Prerequisites (one-time, manual in console)
+
+1. Create an Oracle Cloud account (pick a non-Ashburn home region — see capacity tips above).
+2. Generate an API key under your profile → API Keys → Add API Key → Generate.
+3. Download the private key (`oci_api_key.pem`) and note its absolute path.
+4. Copy the configuration preview — it contains `tenancy`, `user`, `fingerprint`, `region`.
+
+### Run
+
+```bash
+cp deploy/legacy/oci/credentials.env.example deploy/legacy/oci/credentials.env
+# edit credentials.env with values from steps 3 & 4
+deploy/legacy/oci/deploy.sh
+```
+
+The orchestrator:
+
+1. Installs OCI CLI into a local venv (no sudo).
+2. Writes `~/.oci/config` and copies your key.
+3. Creates VCN, subnet, internet gateway, route table, security list (ports 22, 80, 443, 8080).
+4. Generates an SSH keypair (stored in `state/`).
+5. Launches a `VM.Standard.A1.Flex` Ubuntu 22.04 instance (2 OCPU / 12 GB) — retries across availability domains.
+6. SSHes in, runs `oracle-install.sh`, waits for `/health` to return 200.
+7. Prints the live URL.
+
+Total time: 30–50 minutes (mostly Docker images + SciNCL on first boot).
+
+### Step-by-step (if you want to run them individually)
+
+```bash
+deploy/legacy/oci/00-install-cli.sh                              # install CLI (once)
+source deploy/legacy/oci/.venv/bin/activate
+
+set -a; source deploy/legacy/oci/credentials.env; set +a
+deploy/legacy/oci/01-configure.sh                                # write ~/.oci/config
+
+deploy/legacy/oci/02-create-vm.sh                                # idempotent — reuses VCN/instance
+deploy/legacy/oci/03-deploy-app.sh                               # pulls latest code on the server
+```
+
+### Tearing down
+
+```bash
+source deploy/legacy/oci/.venv/bin/activate
+source deploy/legacy/oci/state/vm.env
+
+oci compute instance terminate --instance-id "$INSTANCE_OCID" --force --wait-for-state TERMINATED
+oci network vcn delete --vcn-id "$VCN_OCID" --force --wait-for-state TERMINATED
+rm -rf deploy/legacy/oci/state
+```
+
+### Capacity workaround for the CLI path
+
+Same problem as the manual path. To squeeze in with a smaller shape:
+```bash
+VM_OCPUS=1 VM_MEM_GB=6 deploy/legacy/oci/02-create-vm.sh
+```

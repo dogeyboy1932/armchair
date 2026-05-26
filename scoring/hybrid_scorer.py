@@ -9,8 +9,8 @@ from scoring.category_scorer   import (
     compute_category_jsd, compute_non_obvious,
     course_category_vector,
 )
-from storage                   import postgres_store as pg_store
-from storage                   import neo4j_store    as neo4j
+from storage.postgres import store as pg_store
+from storage.neo4j import store as neo4j
 
 
 _SEM_FLOOR = 0.35  # SciNCL cosine baseline for random engineering text pairs

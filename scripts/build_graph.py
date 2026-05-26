@@ -10,8 +10,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scoring.language_model import build_all_lms
 from scoring.hybrid_scorer  import score_all_pairs
-from storage import postgres_store as pg_store
-from storage import neo4j_store    as neo4j
+from storage.postgres import store as pg_store
+from storage.neo4j import store as neo4j
 
 
 def main():

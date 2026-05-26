@@ -33,8 +33,9 @@ every push to `main`.
 upload on production). That goes straight into the shared cloud DBs — your local
 `uvicorn` will see it too once you refresh, because it's the same Supabase/Aura.
 
-**Optional:** `docker-compose` still works as a fully isolated offline stack. It is
-not the primary dev path when using cloud-backed `.env`.
+**Optional:** the original `docker-compose` stack lives in `deploy/legacy/` for
+fully isolated offline work. It is not the primary dev path when using
+cloud-backed `.env`.
 
 ---
 
@@ -64,7 +65,7 @@ Net cost: **~$0/month** (Fly's 2 GB machine is ~$3.89/mo, covered by the $5 hobb
 
 ## Architecture notes
 
-- **One service**: Fly serves both the static UI (`public/`) and the FastAPI
+- **One service**: Fly serves both the static UI (`ui/`) and the FastAPI
   endpoints from the same origin, so there's no CORS, no CDN, no `config.js`
   rewriting. Just one URL.
 - **One Docker image**, baked with SciNCL (420 MB) + CPU PyTorch + pdfplumber +
@@ -92,6 +93,9 @@ Net cost: **~$0/month** (Fly's 2 GB machine is ~$3.89/mo, covered by the $5 hobb
 2. Paste into `credentials.env`: `NEO4J_URI`, `NEO4J_USER` (often `neo4j`,
    sometimes the instance ID), `NEO4J_PASSWORD`.
 3. *Caveat: Aura Free pauses after 3 days idle. Hit `/health` weekly to keep it up.*
+4. *Caveat: Aura Free has no GDS plugin, so `storage/neo4j/store.py` tries
+   `gds.*` first and falls back to NetworkX Louvain + PageRank computed in
+   the API process. Same results, same edge weights, just runs in Python.*
 
 ### 3. Fly.io
 1. https://fly.io → signup (GitHub OAuth) → add a credit card (required for fraud
@@ -124,8 +128,7 @@ bash deploy/free/deploy.sh
 
 **B. From GitHub (continuous, hands-off):**
 Push to `main`. The workflow in `.github/workflows/deploy-fly.yml` rebuilds &
-deploys automatically. See `deploy/free/GITHUB_ACTIONS.md` for the one-time
-secret setup.
+deploys automatically. See § GitHub Actions below for the one-time secret setup.
 
 The laptop path runs three steps:
 
@@ -196,10 +199,10 @@ Idempotent; only the changed layers are rebuilt/pushed.
 
 | What | Where |
 |---|---|
-| UI (`public/index.html`, `public/upload.html`) | Served by FastAPI on Fly |
+| UI (`ui/index.html`, `ui/upload.html`) | Served by FastAPI on Fly |
 | API process | Fly machine (Chicago `ord`) |
 | SciNCL model weights | Baked into Docker image at `/app/.model_cache` |
-| Pipeline + scripts | `/app/scripts/`, `/app/pipeline/` inside Fly machine |
+| LLM + scripts | `/app/scripts/`, `/app/llm/` inside Fly machine |
 | `courses`, `chunks`, `term_counts`, `similarity_cache`, `topic_*` | Supabase Postgres |
 | `chunk_embeddings` (pgvector) | Supabase Postgres |
 | `Course` nodes + `SIMILAR_TO` edges | Neo4j Aura |
@@ -222,11 +225,50 @@ Idempotent; only the changed layers are rebuilt/pushed.
 ## Optional: running a local copy too
 
 The codebase still supports a local-only run (Milvus + Postgres + Neo4j via
-docker-compose). Set `VECTOR_BACKEND=milvus` in `.env` and:
+the legacy `docker-compose`). Set `VECTOR_BACKEND=milvus` in `.env` and:
 ```bash
-docker-compose up -d
+docker compose -f deploy/legacy/docker-compose.yml up -d
 python scripts/seed.py
 uvicorn api.main:app --reload
 ```
 Production and local are independent stacks — changes to one don't affect the
 other. Use local for iterating on scoring math without touching production.
+
+---
+
+## GitHub Actions (CI/CD)
+
+Every push to `main` triggers a Fly redeploy (API + UI + SciNCL in one image).
+Live URL: **https://siip-armchair-akhil.fly.dev**
+
+| Workflow | Trigger | Effect |
+|---|---|---|
+| `.github/workflows/deploy-fly.yml` | Push to `main`, or manual run | Rebuild Fly image, roll out, smoke-test `/health` |
+
+### One-time secret setup
+
+If Actions shows **"All jobs have failed"**, the usual cause is a missing
+`FLY_API_TOKEN` secret — the deploy step fails before the Docker build starts.
+
+**Option A — automated (recommended):**
+```bash
+flyctl auth login
+gh auth login                                # https://cli.github.com/
+bash deploy/free/setup-github-actions.sh
+```
+
+**Option B — manual:**
+```bash
+flyctl tokens create deploy --app siip-armchair-akhil --name github-actions --expiry 8760h
+```
+Copy the `FlyV1 fm2_...` line and store it as `FLY_API_TOKEN` in
+[GitHub → Settings → Secrets → Actions](https://github.com/dogeyboy1932/armchair/settings/secrets/actions).
+
+### Verify
+
+```bash
+git commit --allow-empty -m "ci: trigger deploy" && git push origin main
+```
+
+Watch <https://github.com/dogeyboy1932/armchair/actions>. A green run means the
+live URL is serving the latest `main` commit.

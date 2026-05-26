@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-import storage.postgres_store as pg_store
+import storage.postgres.store as pg_store
 
 router = APIRouter()
 

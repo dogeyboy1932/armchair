@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
-from storage import neo4j_store as neo4j
+from storage.neo4j import store as neo4j
 
 router = APIRouter()
 

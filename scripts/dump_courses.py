@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import config
-from storage import postgres_store as pg_store
+from storage.postgres import store as pg_store
 
 
 def _parse_objectives_from_chunk(raw_text: str) -> list[str]:

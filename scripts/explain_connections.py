@@ -20,8 +20,8 @@ from collections import defaultdict
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import config
-from pipeline.llm_explainer import explain_connection
-from storage import postgres_store as pg_store
+from llm.llm_explainer import explain_connection
+from storage.postgres import store as pg_store
 
 
 def _load_course_topics() -> dict[str, list[str]]:

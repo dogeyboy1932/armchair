@@ -27,8 +27,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import config
-from pipeline.category_labeler import label_topics_batch
-from storage import postgres_store as pg_store
+from llm.category_labeler import label_topics_batch
+from storage.postgres import store as pg_store
 
 # Boilerplate lines to skip when extracting topics from chunks
 _SKIP_PATTERNS = re.compile(

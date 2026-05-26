@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # One-command Oracle (or any Ubuntu VPS) install.
+#
+# LEGACY: production path is Supabase + Aura + Fly (see deploy/free/).
+# Use this only for self-hosting on a VPS.
+#
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/dogeyboy1932/armchair/main/deploy/oracle-install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/dogeyboy1932/armchair/main/deploy/legacy/oracle-install.sh | bash
 #
 # With Gemini key for pre-generated explanations:
-#   GEMINI_API_KEY=your-key curl -fsSL .../oracle-install.sh | bash
+#   GEMINI_API_KEY=your-key curl -fsSL .../deploy/legacy/oracle-install.sh | bash
 set -euo pipefail
 
 REPO="https://github.com/dogeyboy1932/armchair.git"
@@ -32,7 +36,7 @@ else
 fi
 
 cd "$DIR"
-chmod +x deploy/bootstrap.sh
+chmod +x deploy/legacy/bootstrap.sh
 
 if [[ -n "${GEMINI_API_KEY:-}" ]]; then
   if [[ ! -f .env ]]; then
@@ -46,4 +50,4 @@ if [[ -n "${GEMINI_API_KEY:-}" ]]; then
   echo "GEMINI_API_KEY set from environment."
 fi
 
-exec ./deploy/bootstrap.sh
+exec ./deploy/legacy/bootstrap.sh

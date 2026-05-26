@@ -5,12 +5,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-import storage.postgres_store as pg_store
-import storage.neo4j_store    as neo4j
-from storage import vector_store as vs
+import storage.postgres.store as pg_store
+import storage.neo4j.store    as neo4j
+from storage.vectors import store as vs
 from api.routes import courses, similarity, graph, ingest, topics
 
-PUBLIC_DIR = Path(__file__).parent.parent / "public"
+UI_DIR = Path(__file__).parent.parent / "ui"
 
 
 @asynccontextmanager
@@ -50,14 +50,14 @@ def health():
     return {"status": "ok"}
 
 
-app.mount("/static", StaticFiles(directory=str(PUBLIC_DIR)), name="static")
+app.mount("/static", StaticFiles(directory=str(UI_DIR)), name="static")
 
 
 @app.get("/", include_in_schema=False)
 def ui():
-    return FileResponse(PUBLIC_DIR / "index.html", headers={"Cache-Control": "no-store"})
+    return FileResponse(UI_DIR / "index.html", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/upload", include_in_schema=False)
 def upload_page():
-    return FileResponse(PUBLIC_DIR / "upload.html", headers={"Cache-Control": "no-store"})
+    return FileResponse(UI_DIR / "upload.html", headers={"Cache-Control": "no-store"})

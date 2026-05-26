@@ -18,7 +18,7 @@ COURSE_ID = "ME 340"        # ← change this to the course you want to edit
 # ─────────────────────────────────────────────────────────────────────────────
 
 import config
-from storage import postgres_store as pg_store
+from storage.postgres import store as pg_store
 
 
 def _safe_filename(course_id: str) -> str:

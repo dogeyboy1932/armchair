@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Header, HTTPException, Query
 from typing import Optional
 from pydantic import BaseModel
-import storage.postgres_store as pg_store
+import storage.postgres.store as pg_store
 from scoring.category_scorer import course_category_vector, CATEGORIES
-from pipeline.llm_explainer import explain_connection
+from llm.llm_explainer import explain_connection
 
 router = APIRouter()
 

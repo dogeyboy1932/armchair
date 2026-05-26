@@ -6,9 +6,9 @@ from threading import Lock
 from typing import Optional
 from fastapi import APIRouter, Query, Header, HTTPException
 from pydantic import BaseModel
-import storage.postgres_store as pg_store
+import storage.postgres.store as pg_store
 import config
-from pipeline.llm_explainer import explain_topic_connection
+from llm.llm_explainer import explain_topic_connection
 
 # Load topic descriptions once at import time
 _DEFS: dict = {}

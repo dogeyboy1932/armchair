@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
 # Bootstrap SIIP on a fresh Ubuntu server (Oracle Cloud, AWS, etc.)
 #
+# LEGACY: the production path is Supabase + Aura + Fly (see deploy/free/).
+# This script remains for self-hosting on a VPS or rebuilding the original
+# local Docker stack on a server.
+#
 # Run from a cloned repo:
-#   ./deploy/bootstrap.sh
+#   ./deploy/legacy/bootstrap.sh
 #
 # Or one-liner (clones repo + runs this):
-#   curl -fsSL https://raw.githubusercontent.com/dogeyboy1932/armchair/main/deploy/oracle-install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/dogeyboy1932/armchair/main/deploy/legacy/oracle-install.sh | bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LEGACY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$LEGACY_DIR/../.." && pwd)"
 cd "$ROOT"
 
-COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+COMPOSE="docker compose -f $LEGACY_DIR/docker-compose.yml -f $LEGACY_DIR/docker-compose.prod.yml"
 
 SUDO=""
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
@@ -153,7 +158,7 @@ else
   echo "✓ Live at: http://${PUBLIC_IP}:8080"
   echo ""
   echo "Optional HTTPS: point a domain A-record here, then run:"
-  echo "  SIIP_DOMAIN=your.domain ./deploy/bootstrap.sh"
+  echo "  SIIP_DOMAIN=your.domain ./deploy/legacy/bootstrap.sh"
 fi
 
 echo ""

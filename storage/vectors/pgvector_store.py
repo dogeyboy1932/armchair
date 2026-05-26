@@ -1,19 +1,19 @@
 """
-pgvector-backed vector store. Drop-in replacement for storage/milvus_store.py.
+pgvector-backed vector store. Drop-in replacement for storage/vectors/milvus_store.py.
 
-Uses the SAME Postgres connection as storage/postgres_store.py and requires
+Uses the SAME Postgres connection as storage/postgres/store.py and requires
 the `vector` extension (Supabase has it preinstalled; CREATE EXTENSION is a no-op
 if already present).
 
 Public API matches milvus_store.py exactly so both can be swapped via
-storage/vector_store.py based on the VECTOR_BACKEND env var.
+storage/vectors/store.py based on the VECTOR_BACKEND env var.
 """
 from __future__ import annotations
 
 import numpy as np
 from psycopg2.extras import execute_values
 
-from storage.postgres_store import _Conn
+from storage.postgres.store import _Conn
 
 DIM = 768
 

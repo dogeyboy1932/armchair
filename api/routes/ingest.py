@@ -11,19 +11,19 @@ from scoring.driving_terms     import compute_idf
 from scoring.hybrid_scorer     import score_pair
 from scoring.language_model    import build_all_lms
 from scoring.category_scorer   import course_category_vector
-from storage import vector_store as vs
-from storage import neo4j_store   as neo4j
-from storage import postgres_store as pg_store
+from storage.vectors import store as vs
+from storage.neo4j import store as neo4j
+from storage.postgres import store as pg_store
 
 # Heavy ingest-only deps (PDF parsing, ML model, LLM extractors). These are
 # omitted from the slim production container — when missing the upload routes
 # return 503 instead of crashing at import time.
 try:
     import pdfplumber  # type: ignore
-    from pipeline.chunker          import chunk_course
-    from pipeline.encoder          import encode
-    from pipeline.topic_extractor  import analyze_course, extract_topics
-    from pipeline.category_labeler import label_topic
+    from scoring.chunker          import chunk_course
+    from storage.vectors.encoder          import encode
+    from llm.topic_extractor  import analyze_course, extract_topics
+    from llm.category_labeler import label_topic
     _INGEST_AVAILABLE = True
     _INGEST_DISABLED_REASON = ""
 except ImportError as _e:
